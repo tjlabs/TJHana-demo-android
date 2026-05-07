@@ -1,3 +1,11 @@
 <resources>
     <string name="app_name">TJHana-demo-android</string>
+    <string name="fab_trigger_desc">Toggle Warp View</string>
+    <string name="auth_button">Auth + Init</string>
+    <string name="visibility_test_button">Visibility Test</string>
+    <string name="start_service_button">Start Warp Service</string>
+    <string name="stop_service_button">Stop Warp Service</string>
+    <string name="venus_start_button">Start Venus Service</string>
+    <string name="venus_stop_button">Stop Venus Service</string>
+    <string name="result_default">결과: 없음</string>
 </resources>

@@ -13,3 +13,22 @@
 .externalNativeBuild
 .cxx
 local.properties
+/app/libs
+
+# Gradle / Kotlin
+**/build/
+.kotlin/
+
+# Android Studio / IntelliJ
+.idea/
+!.idea/.gitignore
+!.idea/compiler.xml
+!.idea/gradle.xml
+!.idea/kotlinc.xml
+!.idea/misc.xml
+!.idea/vcs.xml
+.idea/deploymentTargetSelector.xml
+
+# Logs / temp
+*.log
+*.tmp
