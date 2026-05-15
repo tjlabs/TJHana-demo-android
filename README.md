@@ -175,11 +175,3 @@ jupiterManager.requestRouting(
     mergeLinks = false
 )
 ```
-
-## Version Auto-Sync
-
-README marker sections are synchronized automatically from `app/build.gradle.kts` values:
-- `jupiterSdkVersion`
-- `hanaAarName`
-
-Sync runs on every `preBuild` via task `syncReadmeVersions`.
