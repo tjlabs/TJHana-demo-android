@@ -17,23 +17,38 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.tjlabs.tjhana_sdk_android.TJHanaAuth
 import com.tjlabs.tjhana_sdk_android.TJHanaEnvironment
 import com.tjlabs.tjhana_sdk_android.TJHanaLogger
+import com.tjlabs.tjhana_sdk_android.TJJupiterManager
 import com.tjlabs.tjhana_sdk_android.TJVenusManager
 import com.tjlabs.tjhana_sdk_android.TJVenusManagerDelegate
 import com.tjlabs.tjhana_sdk_android.TJWarpView
 import com.tjlabs.tjhana_sdk_android.TJWarpViewDelegate
+import com.tjlabs.tjhana_sdk_android.Point
+import com.tjlabs.tjhana_sdk_android.RoutingStart
+import com.tjlabs.tjhana_sdk_android.TJJupiterManagerDelegate
 import com.tjlabs.tjhana_sdk_android.VenusErrorCode
 import com.tjlabs.tjhana_sdk_android.VenusInitErrorCode
 import com.tjlabs.tjhana_sdk_android.VenusResult
 import com.tjlabs.tjhana_sdk_android.WarpErrorCode
 import com.tjlabs.tjhana_sdk_android.WarpInitErrorCode
 import com.tjlabs.tjhana_sdk_android.WarpWard
+import com.tjlabs.tjlabscommon_sdk_android.uvd.UserMode
+import com.tjlabs.tjlabsjupiter_sdk_android.InitErrorCode
+import com.tjlabs.tjlabsjupiter_sdk_android.InOutState
+import com.tjlabs.tjlabsjupiter_sdk_android.JupiterErrorCode
+import com.tjlabs.tjlabsjupiter_sdk_android.JupiterNavigationRoute
+import com.tjlabs.tjlabsjupiter_sdk_android.JupiterServiceCode
+import com.tjlabs.tjlabsjupiter_sdk_android.JupiterServiceManager
 import com.tjlabs.tjlabsjupiter_sdk_android.api.JupiterRegion
+import com.tjlabs.tjlabsjupiter_sdk_android.api.JupiterResult
+import com.tjlabs.tjlabsjupiter_sdk_android.navi.network.RequestType
 import com.tjlabs.tjlabsresource_sdk_android.ServerProvider
 
 class MainActivity : AppCompatActivity() {
+    private val logTag = "HanaDemo/Jupiter"
     private lateinit var resultTextView: TextView
     private lateinit var warpView: TJWarpView
     private lateinit var venusManager: TJVenusManager
+    private lateinit var jupiterManager: TJJupiterManager
 
     private val permissionRequestCode = 1001
     private val demoUserId = "HanaUser01"
@@ -41,9 +56,11 @@ class MainActivity : AppCompatActivity() {
     private var isAuthCompleted = false
     private var isWarpInitialized = false
     private var isVenusInitialized = false
+    private var isJupiterInitialized = false
     private var authStatusText = "Auth: 대기"
     private var warpInitStatusText = "Warp init: 대기"
     private var venusInitStatusText = "Venus init: 대기"
+    private var jupiterInitStatusText = "Jupiter init: 대기"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -70,6 +87,7 @@ class MainActivity : AppCompatActivity() {
     private fun initializeManagers() {
         initializeWarpManager()
         initializeVenusManager()
+        initializeJupiterManager()
     }
 
     private fun initializeWarpManager() {
@@ -126,16 +144,64 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun initializeJupiterManager() {
+        jupiterManager = TJJupiterManager(application, demoUserId, demoSectorId, false).apply {
+            delegate = object : TJJupiterManagerDelegate {
+                override fun onInitSuccess(isSuccess: Boolean, errorCode: InitErrorCode?) {
+                    TJHanaLogger.i(logTag, "[JUPITER_INIT] result success=$isSuccess, code=$errorCode")
+                    isJupiterInitialized = isSuccess
+                    jupiterInitStatusText = "Jupiter init: success=$isSuccess, code=$errorCode"
+                    showInitStatus()
+                }
+
+                override fun onJupiterSuccess(isSuccess: Boolean, errorCode: JupiterErrorCode?) {
+                    showResult("[Jupiter] service: success=$isSuccess, code=$errorCode")
+                }
+
+                override fun onJupiterReport(code: JupiterServiceCode, message: String) {
+                    showResult("[Jupiter] report: code=$code, message=$message")
+                }
+
+                override fun onJupiterResult(result: JupiterResult) {
+                    showResult("[Jupiter] result: $result")
+                }
+
+                override fun isJupiterInOutStateChanged(inOutState: InOutState) {
+                    showResult("[Jupiter] inOutState: $inOutState")
+                }
+
+                override fun isUserGuidanceOut() {
+                    showResult("[Jupiter] user guidance out")
+                }
+
+                override fun isNavigationRouteChanged(routes: List<JupiterNavigationRoute>) {
+                    showResult("[Jupiter] route changed: count=${routes.size}")
+                }
+
+                override fun isNavigationRouteFailed() {
+                    showResult("[Jupiter] route failed")
+                }
+
+                override fun isWaypointChanged(waypoints: List<List<Double>>) {
+                    showResult("[Jupiter] waypoint changed: count=${waypoints.size}")
+                }
+            }
+        }
+    }
+
     private fun authenticateAndInitializeSdk() {
         val accessKey = BuildConfig.AUTH_ACCESS_KEY.trim()
         val accessSecretKey = BuildConfig.AUTH_SECRET_ACCESS_KEY.trim()
+        TJHanaLogger.i(logTag, "[AUTH] request started")
 
         TJHanaAuth.auth(application, accessKey, accessSecretKey) { code, success ->
             if (!success) {
+                TJHanaLogger.w(logTag, "[AUTH] failed code=$code")
                 authStatusText = "Auth: 실패(code=$code)"
                 showInitStatus()
                 Toast.makeText(this, "Auth failed: $code", Toast.LENGTH_SHORT).show()
             } else {
+                TJHanaLogger.i(logTag, "[AUTH] success code=$code")
                 isAuthCompleted = true
                 authStatusText = "Auth: 성공(code=$code)"
                 initializeAllServices()
@@ -192,6 +258,56 @@ class MainActivity : AppCompatActivity() {
             venusManager.stopService()
             showResult("[Venus] stopService 호출")
         }
+
+        findViewById<Button>(R.id.btn_jupiter_init).setOnClickListener {
+            if (!isAuthCompleted) {
+                showResult("먼저 Auth를 진행하세요")
+                return@setOnClickListener
+            }
+            TJHanaLogger.i(logTag, "[JUPITER_INIT] initialize requested")
+            jupiterManager.initialize()
+            showResult("[Jupiter] initialize 호출")
+        }
+
+        findViewById<Button>(R.id.btn_jupiter_start).setOnClickListener {
+            if (!isAuthCompleted || !isJupiterInitialized) {
+                showResult("먼저 Auth/Jupiter Init을 진행하세요")
+                return@setOnClickListener
+            }
+            jupiterManager.startService(UserMode.MODE_PEDESTRIAN)
+            showResult("[Jupiter] startService 호출")
+        }
+
+        findViewById<Button>(R.id.btn_jupiter_stop).setOnClickListener {
+            if (!isAuthCompleted || !isJupiterInitialized) {
+                showResult("먼저 Auth/Jupiter Init을 진행하세요")
+                return@setOnClickListener
+            }
+            jupiterManager.stopService { success, message ->
+                showResult("[Jupiter] stopService: success=$success, message=$message")
+            }
+        }
+
+        findViewById<Button>(R.id.btn_jupiter_destination).setOnClickListener {
+            if (!isAuthCompleted || !isJupiterInitialized) {
+                showResult("먼저 Auth/Jupiter Init을 진행하세요")
+                return@setOnClickListener
+            }
+            val destination = Point(level_id = 1, x = 10, y = 10)
+            jupiterManager.setNavigationDestination(destination)
+            showResult("[Jupiter] destination 설정: $destination")
+        }
+
+        findViewById<Button>(R.id.btn_jupiter_routing).setOnClickListener {
+            if (!isAuthCompleted || !isJupiterInitialized) {
+                showResult("먼저 Auth/Jupiter Init을 진행하세요")
+                return@setOnClickListener
+            }
+            val start = RoutingStart(level_id = 1, x = 0, y = 0, absolute_heading = 0)
+            val destination = Point(level_id = 1, x = 10, y = 10)
+            jupiterManager.requestRouting(start, destination, emptyList(), RequestType.INIT, false)
+            showResult("[Jupiter] routing 요청: $start -> $destination")
+        }
     }
 
     private fun buildWarpClickText(wards: List<WarpWard>): String {
@@ -216,7 +332,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showInitStatus() {
-        resultTextView.text = listOf(authStatusText, warpInitStatusText, venusInitStatusText)
+        resultTextView.text = listOf(authStatusText, warpInitStatusText, venusInitStatusText, jupiterInitStatusText)
             .joinToString("\n")
     }
 

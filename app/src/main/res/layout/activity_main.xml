@@ -58,7 +58,42 @@
             android:id="@+id/btn_venus_stop"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
             android:text="@string/venus_stop_button" />
+
+        <Button
+            android:id="@+id/btn_jupiter_init"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:text="@string/jupiter_init_button" />
+
+        <Button
+            android:id="@+id/btn_jupiter_start"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:text="@string/jupiter_start_button" />
+
+        <Button
+            android:id="@+id/btn_jupiter_stop"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:text="@string/jupiter_stop_button" />
+
+        <Button
+            android:id="@+id/btn_jupiter_destination"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:text="@string/jupiter_destination_button" />
+
+        <Button
+            android:id="@+id/btn_jupiter_routing"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/jupiter_routing_button" />
     </LinearLayout>
 
     <TextView

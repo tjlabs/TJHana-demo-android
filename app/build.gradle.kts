@@ -8,7 +8,7 @@ plugins {
 
 val versionMajor = 1
 val versionMinor = 0
-val versionPatch = 0
+val versionPatch = 1
 val computedVersionCode = (versionMajor * 100) + (versionMinor * 10) + versionPatch
 val computedVersionName = "$versionMajor.$versionMinor.$versionPatch"
 
@@ -30,8 +30,8 @@ val authSecretAccessKey = (
         ).trim()
 
 fun String.toBuildConfigString(): String = this.replace("\\", "\\\\").replace("\"", "\\\"")
-val hanaAarName = "TJHana-sdk-android-1.0.0"
-val jupiterSdkVersion = "2.0.10"
+val hanaAarName = "TJHana-sdk-android-1.0.1"
+val jupiterSdkVersion = "2.0.12"
 
 val syncReadmeVersions by tasks.registering {
     group = "documentation"
