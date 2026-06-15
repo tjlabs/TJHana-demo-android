@@ -5,17 +5,18 @@
 TJHana-demo-android is a minimal Android sample app for integrating **TJLabs Hana SDK (AAR)**.
 
 <!-- JUPITER_SDK_VERSION_START -->
-Jupiter SDK version: 2.0.12
+Jupiter SDK version: 2.0.14
 <!-- JUPITER_SDK_VERSION_END -->
 
 <!-- HANA_SDK_AAR_VERSION_START -->
-Hana SDK (AAR): TJHana-sdk-android-1.0.1
+Hana SDK (AAR): TJHana-sdk-android-1.0.2
 <!-- HANA_SDK_AAR_VERSION_END -->
 
 The app demonstrates Hana SDK flows with:
 - Authentication (`AUTH`)
 - Warp initialize/start/stop
 - Warp view visibility and trigger interaction
+- Warp selection change callback
 - Venus initialize/start/stop
 - Venus result callback handling
 - Jupiter manager initialize/start/stop
@@ -25,8 +26,9 @@ The app demonstrates Hana SDK flows with:
 
 - Hana SDK auth/init/start/stop flow example
 - Warp view attach by trigger (`FloatingActionButton`)
+- Warp ward selection callback (`onWarpSelectionChanged`)
 - Venus service result callback (`onVenusResult`)
-- Jupiter service delegate callback (`onJupiterResult`, route events)
+- Jupiter service delegate callback (`TJJupiterManagerDelegate`)
 - Runtime permission request flow (Location/Bluetooth)
 - Warp click callback and ward content URL parsing
 
@@ -35,6 +37,15 @@ The app demonstrates Hana SDK flows with:
 - Android `minSdk 29+`
 - Android Studio (latest stable recommended)
 - Kotlin-based Android app
+
+## Build Notes
+
+- `release` build uses `isMinifyEnabled = true`
+- Optional release signing is loaded from `local.properties` or Gradle properties:
+  - `RELEASE_STORE_FILE`
+  - `RELEASE_STORE_PASSWORD`
+  - `RELEASE_KEY_ALIAS`
+  - `RELEASE_KEY_PASSWORD`
 
 ### Required permissions
 
@@ -82,7 +93,7 @@ Copy AAR file into:
 
 ```text
 <!-- HANA_AAR_PATH_START -->
-app/libs/TJHana-sdk-android-1.0.1.aar
+app/libs/TJHana-sdk-android-1.0.2.aar
 <!-- HANA_AAR_PATH_END -->
 ```
 
@@ -94,8 +105,8 @@ If file name changes, update `hanaAarName` in `app/build.gradle.kts`.
 // app/build.gradle.kts
 <!-- APP_DEPENDENCIES_START -->
 dependencies {
-    implementation(files("libs/TJHana-sdk-android-1.0.1.aar"))
-    implementation("com.github.tjlabs:TJLabsJupiter-sdk-android:2.0.12")
+    implementation(files("libs/TJHana-sdk-android-1.0.2.aar"))
+    implementation("com.github.tjlabs:TJLabsJupiter-sdk-android:2.0.14")
 }
 <!-- APP_DEPENDENCIES_END -->
 ```
@@ -129,6 +140,8 @@ warpView.initialize(id = userId, sectorId = sectorId)
 venusManager.initialize(id = userId, sector_id = sectorId)
 ```
 
+This demo initializes Warp/Venus after auth. Jupiter is initialized separately by the `Init Jupiter Service` button.
+
 ### 4. Start services
 
 ```kotlin
@@ -143,6 +156,14 @@ warpView.setVisibility(true)
 warpView.setVisibility(false)
 ```
 
+Warp selection callback example:
+
+```kotlin
+override fun onWarpSelectionChanged(wards: List<WarpWard>) {
+    // handle selected wards
+}
+```
+
 ### 6. Stop services
 
 ```kotlin
@@ -154,6 +175,7 @@ venusManager.stopService()
 
 ```kotlin
 val jupiterManager = TJJupiterManager(application, userId, sectorId, false)
+jupiterManager.delegate = object : TJJupiterManagerDelegate { /* ... */ }
 jupiterManager.initialize()
 jupiterManager.startService(UserMode.MODE_PEDESTRIAN)
 ```
@@ -168,10 +190,28 @@ Request routing:
 
 ```kotlin
 jupiterManager.requestRouting(
-    start = RoutingStart(level_id = 1, x = 0, y = 0, absolute_heading = 0),
-    destination = Point(level_id = 1, x = 10, y = 10),
-    waypoints = emptyList(),
-    requestType = RequestType.INIT,
-    mergeLinks = false
+    RoutingStart(level_id = 1, x = 0, y = 0, absolute_heading = 0),
+    Point(level_id = 1, x = 10, y = 10),
+    emptyList(),
+    RequestType.INIT,
+    false
 )
 ```
+
+Delegate callbacks used in this demo:
+
+```kotlin
+override fun onInitSuccess(isSuccess: Boolean, errorCode: InitErrorCode?) { }
+override fun onJupiterSuccess(isSuccess: Boolean, errorCode: JupiterErrorCode?) { }
+override fun onJupiterResult(result: JupiterResult) { }
+override fun isNavigationRouteChanged(
+    routeId: String?,
+    totalDistance: Int?,
+    routes: MutableList<JupiterNavigationRoute>
+) { }
+```
+
+## Demo Defaults
+
+- `demoUserId = "HanaUser01"`
+- `demoSectorId = 8`

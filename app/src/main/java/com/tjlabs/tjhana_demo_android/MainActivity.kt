@@ -52,7 +52,7 @@ class MainActivity : AppCompatActivity() {
 
     private val permissionRequestCode = 1001
     private val demoUserId = "HanaUser01"
-    private val demoSectorId = 1
+    private val demoSectorId = 8
     private var isAuthCompleted = false
     private var isWarpInitialized = false
     private var isVenusInitialized = false
@@ -90,6 +90,7 @@ class MainActivity : AppCompatActivity() {
         initializeJupiterManager()
     }
 
+    
     private fun initializeWarpManager() {
         val triggerFab = findViewById<FloatingActionButton>(R.id.fab_trigger)
 
@@ -101,6 +102,10 @@ class MainActivity : AppCompatActivity() {
                     showInitStatus()
                 }
 
+                override fun onWarpSelectionChanged(wards: List<WarpWard>) {
+                    showResult(buildWarpSelectionText(wards))
+                }
+
                 override fun onWarpSuccess(isSuccess: Boolean, code: WarpErrorCode) {
                     showResult("[Warp] 서비스 결과: success=$isSuccess, code=$code")
                 }
@@ -110,7 +115,7 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
-
+        warpView.setSelectionInterval()
         triggerFab.post { warpView.configureFrame(triggerFab) }
     }
 
@@ -174,7 +179,11 @@ class MainActivity : AppCompatActivity() {
                     showResult("[Jupiter] user guidance out")
                 }
 
-                override fun isNavigationRouteChanged(routes: List<JupiterNavigationRoute>) {
+                override fun isNavigationRouteChanged(
+                    routeId: String?,
+                    totalDistance: Int?,
+                    routes: MutableList<JupiterNavigationRoute>
+                ) {
                     showResult("[Jupiter] route changed: count=${routes.size}")
                 }
 
@@ -327,6 +336,15 @@ class MainActivity : AppCompatActivity() {
         return "[Warp] 클릭 결과: count=${wards.size}\n$wardDetails"
     }
 
+    private fun buildWarpSelectionText(wards: List<WarpWard>): String {
+        if (wards.isEmpty()) return "[Warp] selection changed: count=0"
+
+        val summary = wards.joinToString("\n") {
+            "id=${it.id}, name=${it.ward_name}, rssi=${it.ward_rssi}"
+        }
+        return "[Warp] selection changed: count=${wards.size}\n$summary"
+    }
+
     private fun showResult(message: String) {
         resultTextView.text = message
     }
@@ -356,4 +374,5 @@ class MainActivity : AppCompatActivity() {
             ActivityCompat.requestPermissions(this, permissions, permissionRequestCode)
         }
     }
+
 }

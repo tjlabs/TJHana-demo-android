@@ -29,9 +29,28 @@ val authSecretAccessKey = (
             ?: localProperties.getProperty("AUTH_SECRET_ACCESS_KEY", "")
         ).trim()
 
+
 fun String.toBuildConfigString(): String = this.replace("\\", "\\\\").replace("\"", "\\\"")
-val hanaAarName = "TJHana-sdk-android-1.0.1"
-val jupiterSdkVersion = "2.0.12"
+
+val releaseStoreFilePath: String = providers.gradleProperty("RELEASE_STORE_FILE").orNull
+    ?: localProperties.getProperty("RELEASE_STORE_FILE", "")
+val releaseStorePassword: String = providers.gradleProperty("RELEASE_STORE_PASSWORD").orNull
+    ?: localProperties.getProperty("RELEASE_STORE_PASSWORD", "")
+val releaseKeyAlias: String = providers.gradleProperty("RELEASE_KEY_ALIAS").orNull
+    ?: localProperties.getProperty("RELEASE_KEY_ALIAS", "")
+val releaseKeyPassword: String = providers.gradleProperty("RELEASE_KEY_PASSWORD").orNull
+    ?: localProperties.getProperty("RELEASE_KEY_PASSWORD", "")
+
+
+val releaseStoreFile = if (releaseStoreFilePath.isNotBlank()) rootProject.file(releaseStoreFilePath) else null
+val canUseReleaseSigning = releaseStoreFile?.exists() == true &&
+        releaseStorePassword.isNotBlank() &&
+        releaseKeyAlias.isNotBlank() &&
+        releaseKeyPassword.isNotBlank()
+
+
+val hanaAarName = "TJHana-sdk-android-1.0.2"
+val jupiterSdkVersion = "2.0.14"
 
 val syncReadmeVersions by tasks.registering {
     group = "documentation"
@@ -86,13 +105,30 @@ android {
 
     }
 
+    signingConfigs {
+        create("release") {
+            val storeFilePath = releaseStoreFilePath.trim()
+            storeFile = when {
+                storeFilePath.isBlank() -> null
+                storeFilePath.startsWith("/") -> file(storeFilePath)
+                else -> rootProject.file(storeFilePath)
+            }
+            storePassword = releaseStorePassword.trim().ifEmpty { null }
+            keyAlias = releaseKeyAlias.trim().ifEmpty { null }
+            keyPassword = releaseKeyPassword.trim().ifEmpty { null }
+        }
+    }
+
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            if (canUseReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
     compileOptions {
@@ -106,6 +142,8 @@ android {
     buildFeatures {
         buildConfig = true
     }
+
+
 }
 
 dependencies {
