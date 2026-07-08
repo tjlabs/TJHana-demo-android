@@ -14,34 +14,30 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.google.android.material.floatingactionbutton.FloatingActionButton
+import com.tjlabs.tjhana_sdk_android.InOutState
+import com.tjlabs.tjhana_sdk_android.InitErrorCode
+import com.tjlabs.tjhana_sdk_android.JupiterErrorCode
+import com.tjlabs.tjhana_sdk_android.JupiterNavigationRoute
+import com.tjlabs.tjhana_sdk_android.JupiterResult
+import com.tjlabs.tjhana_sdk_android.JupiterServiceCode
+import com.tjlabs.tjhana_sdk_android.Point
+import com.tjlabs.tjhana_sdk_android.RequestType
+import com.tjlabs.tjhana_sdk_android.RoutingStart
 import com.tjlabs.tjhana_sdk_android.TJHanaAuth
-import com.tjlabs.tjhana_sdk_android.TJHanaEnvironment
 import com.tjlabs.tjhana_sdk_android.TJHanaLogger
 import com.tjlabs.tjhana_sdk_android.TJJupiterManager
+import com.tjlabs.tjhana_sdk_android.TJJupiterManagerDelegate
 import com.tjlabs.tjhana_sdk_android.TJVenusManager
 import com.tjlabs.tjhana_sdk_android.TJVenusManagerDelegate
 import com.tjlabs.tjhana_sdk_android.TJWarpView
 import com.tjlabs.tjhana_sdk_android.TJWarpViewDelegate
-import com.tjlabs.tjhana_sdk_android.Point
-import com.tjlabs.tjhana_sdk_android.RoutingStart
-import com.tjlabs.tjhana_sdk_android.TJJupiterManagerDelegate
+import com.tjlabs.tjhana_sdk_android.UserMode
 import com.tjlabs.tjhana_sdk_android.VenusErrorCode
 import com.tjlabs.tjhana_sdk_android.VenusInitErrorCode
 import com.tjlabs.tjhana_sdk_android.VenusResult
 import com.tjlabs.tjhana_sdk_android.WarpErrorCode
 import com.tjlabs.tjhana_sdk_android.WarpInitErrorCode
 import com.tjlabs.tjhana_sdk_android.WarpWard
-import com.tjlabs.tjlabscommon_sdk_android.uvd.UserMode
-import com.tjlabs.tjlabsjupiter_sdk_android.InitErrorCode
-import com.tjlabs.tjlabsjupiter_sdk_android.InOutState
-import com.tjlabs.tjlabsjupiter_sdk_android.JupiterErrorCode
-import com.tjlabs.tjlabsjupiter_sdk_android.JupiterNavigationRoute
-import com.tjlabs.tjlabsjupiter_sdk_android.JupiterServiceCode
-import com.tjlabs.tjlabsjupiter_sdk_android.JupiterServiceManager
-import com.tjlabs.tjlabsjupiter_sdk_android.api.JupiterRegion
-import com.tjlabs.tjlabsjupiter_sdk_android.api.JupiterResult
-import com.tjlabs.tjlabsjupiter_sdk_android.navi.network.RequestType
-import com.tjlabs.tjlabsresource_sdk_android.ServerProvider
 
 class MainActivity : AppCompatActivity() {
     private val logTag = "HanaDemo/Jupiter"
@@ -182,7 +178,7 @@ class MainActivity : AppCompatActivity() {
                 override fun isNavigationRouteChanged(
                     routeId: String?,
                     totalDistance: Int?,
-                    routes: MutableList<JupiterNavigationRoute>
+                    routes: List<JupiterNavigationRoute>
                 ) {
                     showResult("[Jupiter] route changed: count=${routes.size}")
                 }

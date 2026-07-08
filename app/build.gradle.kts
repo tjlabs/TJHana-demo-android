@@ -8,7 +8,7 @@ plugins {
 
 val versionMajor = 1
 val versionMinor = 0
-val versionPatch = 1
+val versionPatch = 3
 val computedVersionCode = (versionMajor * 100) + (versionMinor * 10) + versionPatch
 val computedVersionName = "$versionMajor.$versionMinor.$versionPatch"
 
@@ -49,7 +49,6 @@ val canUseReleaseSigning = releaseStoreFile?.exists() == true &&
         releaseKeyPassword.isNotBlank()
 
 
-val hanaAarName = "TJHana-sdk-android-1.0.2"
 val jupiterSdkVersion = "2.0.14"
 
 val syncReadmeVersions by tasks.registering {
@@ -65,23 +64,6 @@ val syncReadmeVersions by tasks.registering {
         updated = updated.replace(
             Regex("(?s)(<!-- JUPITER_SDK_VERSION_START -->\\s*).*?(\\s*<!-- JUPITER_SDK_VERSION_END -->)"),
             "$1Jupiter SDK version: $jupiterSdkVersion$2"
-        )
-        updated = updated.replace(
-            Regex("(?s)(<!-- HANA_SDK_AAR_VERSION_START -->\\s*).*?(\\s*<!-- HANA_SDK_AAR_VERSION_END -->)"),
-            "$1Hana SDK (AAR): $hanaAarName$2"
-        )
-        updated = updated.replace(
-            Regex("(?s)(<!-- HANA_AAR_PATH_START -->\\s*).*?(\\s*<!-- HANA_AAR_PATH_END -->)"),
-            "$1app/libs/$hanaAarName.aar$2"
-        )
-        updated = updated.replace(
-            Regex("(?s)(<!-- APP_DEPENDENCIES_START -->\\s*).*?(\\s*<!-- APP_DEPENDENCIES_END -->)"),
-            """
-            $1dependencies {
-                implementation(files("libs/$hanaAarName.aar"))
-                implementation("com.github.tjlabs:TJLabsJupiter-sdk-android:$jupiterSdkVersion")
-            }$2
-            """.trimIndent()
         )
 
         readme.writeText(updated)
@@ -147,8 +129,7 @@ android {
 }
 
 dependencies {
-    implementation(files("libs/$hanaAarName.aar"))
-    implementation("com.github.tjlabs:TJLabsJupiter-sdk-android:$jupiterSdkVersion")
+    implementation("com.github.tjlabs:TJHana-sdk-android:1.0.5")
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
