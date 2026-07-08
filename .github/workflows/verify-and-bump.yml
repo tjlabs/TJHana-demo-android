@@ -9,6 +9,11 @@ on:
         description: "Target Hana SDK version (e.g. 1.0.6)"
         required: true
         type: string
+      sector_id:
+        description: "Sector ID used by TJVenusManager.initialize() during verification"
+        required: false
+        type: string
+        default: "8"
 
 permissions:
   contents: write
@@ -26,12 +31,14 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.set.outputs.version }}
+      sector_id: ${{ steps.set.outputs.sector_id }}
     steps:
       - name: Resolve inputs
         id: set
         shell: bash
         run: |
           VERSION="${{ github.event.client_payload.version || inputs.version }}"
+          SECTOR_ID="${{ github.event.client_payload.sector_id || inputs.sector_id || '8' }}"
           if [[ -z "$VERSION" ]]; then
             echo "::error::version is required"
             exit 1
@@ -41,7 +48,8 @@ jobs:
             exit 1
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "Resolved version=$VERSION"
+          echo "sector_id=$SECTOR_ID" >> "$GITHUB_OUTPUT"
+          echo "Resolved version=$VERSION sector_id=$SECTOR_ID"
 
   verify:
     needs: resolve-inputs
@@ -56,6 +64,12 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
       - name: Override TJHana-sdk-android dependency to release tag
         shell: bash
         run: |
@@ -63,15 +77,30 @@ jobs:
           sed -i -E "s|(com\.github\.tjlabs:TJHana-sdk-android:)[0-9]+\.[0-9]+\.[0-9]+|\1${VERSION}|" app/build.gradle.kts
           grep 'com.github.tjlabs:TJHana-sdk-android' app/build.gradle.kts
 
-      - name: Build demo app against new SDK
-        run: ./gradlew :app:assembleDebug --no-daemon --stacktrace
+      - name: Run HanaAuthInitTest on emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          ORG_GRADLE_PROJECT_AUTH_ACCESS_KEY: ${{ secrets.AUTH_ACCESS_KEY }}
+          ORG_GRADLE_PROJECT_AUTH_SECRET_ACCESS_KEY: ${{ secrets.AUTH_SECRET_ACCESS_KEY }}
+        with:
+          api-level: 30
+          arch: x86_64
+          target: default
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: >-
+            ./gradlew :app:connectedDebugAndroidTest
+            -Pandroid.testInstrumentationRunnerArguments.class=com.tjlabs.tjhana_demo_android.HanaAuthInitTest
+            -Pandroid.testInstrumentationRunnerArguments.sectorId=${{ needs.resolve-inputs.outputs.sector_id }}
+            --stacktrace
 
-      - name: Upload build reports
-        if: failure()
+      - name: Upload test reports
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: demo-build-reports
-          path: app/build/reports/**
+          name: androidTest-report
+          path: app/build/reports/androidTests/connected/**
           if-no-files-found: ignore
 
   bump:
