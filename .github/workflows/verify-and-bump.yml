@@ -155,14 +155,16 @@ jobs:
           if git diff --cached --quiet; then
             echo "::warning::No changes to commit (already on ${VERSION}?)"
             echo "branch=${BRANCH}" >> "$GITHUB_OUTPUT"
+            echo "pushed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           git commit -m "chore: bump Hana SDK to ${VERSION}"
           git push -u origin "${BRANCH}"
           echo "branch=${BRANCH}" >> "$GITHUB_OUTPUT"
+          echo "pushed=true" >> "$GITHUB_OUTPUT"
 
       - name: Open Draft PR
-        if: steps.branch.outputs.skip != 'true'
+        if: steps.branch.outputs.skip != 'true' && steps.commit.outputs.pushed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
