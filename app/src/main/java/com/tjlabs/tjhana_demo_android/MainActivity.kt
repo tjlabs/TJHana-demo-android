@@ -53,6 +53,7 @@ class MainActivity : AppCompatActivity() {
     private var isWarpInitialized = false
     private var isVenusInitialized = false
     private var isJupiterInitialized = false
+    private var isJupiterMockEnabled = false
     private var authStatusText = "Auth: 대기"
     private var warpInitStatusText = "Warp init: 대기"
     private var venusInitStatusText = "Venus init: 대기"
@@ -274,6 +275,19 @@ class MainActivity : AppCompatActivity() {
             showResult("[Jupiter] initialize 호출")
         }
 
+        findViewById<Button>(R.id.btn_jupiter_mock_toggle).setOnClickListener { button ->
+            if (!isJupiterInitialized) {
+                showResult("먼저 Jupiter Init을 진행하세요")
+                return@setOnClickListener
+            }
+            isJupiterMockEnabled = !isJupiterMockEnabled
+            jupiterManager.setMockMode(isJupiterMockEnabled)
+            (button as Button).setText(
+                if (isJupiterMockEnabled) R.string.jupiter_mock_on else R.string.jupiter_mock_off
+            )
+            showResult("[Jupiter] mock mode = $isJupiterMockEnabled")
+        }
+
         findViewById<Button>(R.id.btn_jupiter_start).setOnClickListener {
             if (!isAuthCompleted || !isJupiterInitialized) {
                 showResult("먼저 Auth/Jupiter Init을 진행하세요")
@@ -329,7 +343,7 @@ class MainActivity : AppCompatActivity() {
         val wardDetails = wards.joinToString("\n\n") { ward ->
             val urls = ward.ward_contents.map { it.contents_url.toString() }.distinct()
             buildString {
-                append("ward id=${ward.id}, name=${ward.ward_name}, rssi=${ward.ward_rssi}\n")
+                append("ward id=${ward.id}, name=${ward.ward_name}, rssi=${ward.ward_rssi}, x=${ward.x}, y=${ward.y}\n")
                 append(
                     if (urls.isEmpty()) "  urls: - 없음"
                     else "  urls:\n" + urls.joinToString("\n") { "  - $it" }
@@ -344,7 +358,7 @@ class MainActivity : AppCompatActivity() {
         if (wards.isEmpty()) return "[Warp] selection changed: count=0"
 
         val summary = wards.joinToString("\n") {
-            "id=${it.id}, name=${it.ward_name}, rssi=${it.ward_rssi}"
+            "id=${it.id}, name=${it.ward_name}, rssi=${it.ward_rssi}, x=${it.x}, y=${it.y}"
         }
         return "[Warp] selection changed: count=${wards.size}\n$summary"
     }
