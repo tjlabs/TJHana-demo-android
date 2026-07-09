@@ -310,8 +310,16 @@ class MainActivity : AppCompatActivity() {
             }
             val start = RoutingStart(level_id = 1, x = 0, y = 0, absolute_heading = 0)
             val destination = Point(level_id = 1, x = 10, y = 10)
-            jupiterManager.requestRouting(start, destination, emptyList(), RequestType.INIT, false)
-            showResult("[Jupiter] routing 요청: $start -> $destination")
+            jupiterManager.requestRouting(start, destination, emptyList(), RequestType.INIT, false) { result ->
+                val summary = result.routes.joinToString("\n") {
+                    "level=${it.level_name}(${it.level_id}) (${it.x}, ${it.y})"
+                }
+                showResult(
+                    "[Jupiter] routing 결과 ($start -> $destination)\n" +
+                        "failureReason=${result.failureReason?.value ?: "nil"}\n" +
+                        summary
+                )
+            }
         }
     }
 
