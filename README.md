@@ -186,7 +186,7 @@ Set destination:
 jupiterManager.setNavigationDestination(Point(level_id = 1, x = 10, y = 10))
 ```
 
-Request routing:
+Request routing (SDK 1.0.6+ requires a completion callback):
 
 ```kotlin
 jupiterManager.requestRouting(
@@ -195,8 +195,33 @@ jupiterManager.requestRouting(
     emptyList(),
     RequestType.INIT,
     false
-)
+) { result ->
+    // result.routes: List<RoutingRoute>
+    // result.failureReason: NavigationRouteFailureReason?
+}
 ```
+
+> ⚠️ Hana SDK 1.0.6 임시 동작: `requestRouting`은 요청 내용과 무관하게 항상 고정된 `SAMPLE_ROUTING_RESULT`를 completion으로 반환합니다. 정식 동작 전환 시 제거되는 임시 처리입니다.
+
+### 8. Jupiter Mock Mode (Hana SDK 1.0.6+)
+
+연동 테스트/UI 확인용으로 실제 측위 대신 **고정 경로를 따라가는 mock `JupiterResult`를 스트리밍**할 수 있습니다. 이 데모 앱에서는 화면의 **`Jupiter Mock Mode` 버튼**으로 토글할 수 있습니다.
+
+```kotlin
+// Jupiter가 initialize된 이후 호출
+jupiterManager.setMockMode(true)   // 이후 startService에서 mock 스트림도 함께 시작
+jupiterManager.startService(UserMode.MODE_PEDESTRIAN)
+// ...
+jupiterManager.stopService { _, _ -> } // mock 타이머까지 함께 정지
+```
+
+동작 요약:
+- 간격 0.2초 (5 Hz), 가정 속도 4.0 m/s, 내부 SAMPLE 경로(`level_id=700`, `"B2"`, 좌표 (70,10)→(70,18)→(10,18)→(10,29)→(5,29))를 등속 리샘플링
+- 각 tick의 `JupiterResult`는 `TJJupiterManagerDelegate.onJupiterResult(...)`로 메인 스레드 전달
+- Mock 활성 동안 하위 SDK로부터 오는 실제 `onJupiterResult`는 무시됨
+- 경로 끝 도달 시 자동 정지
+
+> ⚠️ Mock은 개발/연동 확인용 임시 기능이며, 프로덕션 로직이 mock 결과에 의존하도록 만들지 마세요.
 
 Delegate callbacks used in this demo:
 
