@@ -5,11 +5,11 @@
 TJHana-demo-android is a minimal Android sample app for integrating **TJLabs Hana SDK (AAR)**.
 
 <!-- JUPITER_SDK_VERSION_START -->
-Jupiter SDK version: 2.0.14
+Jupiter SDK version: 2.0.28-onprem-SNAPSHOT (on-prem 지원 브렌치, mavenLocal)
 <!-- JUPITER_SDK_VERSION_END -->
 
 <!-- HANA_SDK_AAR_VERSION_START -->
-Hana SDK (AAR): TJHana-sdk-android-1.0.2
+Hana SDK (AAR): TJHana-sdk-android-1.0.7
 <!-- HANA_SDK_AAR_VERSION_END -->
 
 The app demonstrates Hana SDK flows with:
@@ -63,6 +63,39 @@ Runtime permission check in this demo requires:
 - Location (`FINE`)
 - Bluetooth scan on Android 12+
 
+### ⚠️ Cleartext HTTP (필수)
+
+Hana SDK 는 on-prem PMS 서버 (`http://<host>:<port>`) 로 접속합니다. Android 9(API 28)+ 는
+평문 통신을 기본 차단하므로 **소비 앱에서 network security config 를 설정해야 합니다.**
+
+`app/src/main/res/xml/network_security_config.xml`:
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <!-- 하나 온프레미스 서버 IP (배포처에서 공유받은 값 사용) -->
+        <domain includeSubdomains="false">HANA_SERVER_IP</domain>
+        <!-- 다른 서버 (예: 사내 개발) 사용 시 해당 IP 추가 -->
+    </domain-config>
+</network-security-config>
+```
+
+`AndroidManifest.xml`:
+
+```xml
+<application
+    android:networkSecurityConfig="@xml/network_security_config"
+    ...>
+```
+
+`TJHanaEnvironment.setBaseUrl(...)` 로 다른 서버 IP 를 지정하는 경우, 해당 IP 도 위 config 에
+추가해야 합니다. 등록되지 않은 cleartext 호스트로 요청 시 다음 에러가 발생합니다:
+
+```
+CLEARTEXT communication to <ip> not permitted by network security policy
+```
+
 ## Setup
 
 ### 1. Add repositories
@@ -93,7 +126,7 @@ Copy AAR file into:
 
 ```text
 <!-- HANA_AAR_PATH_START -->
-app/libs/TJHana-sdk-android-1.0.2.aar
+app/libs/TJHana-sdk-android-1.0.7.aar
 <!-- HANA_AAR_PATH_END -->
 ```
 
@@ -105,11 +138,15 @@ If file name changes, update `hanaAarName` in `app/build.gradle.kts`.
 // app/build.gradle.kts
 <!-- APP_DEPENDENCIES_START -->
 dependencies {
-    implementation(files("libs/TJHana-sdk-android-1.0.2.aar"))
-    implementation("com.github.tjlabs:TJLabsJupiter-sdk-android:2.0.14")
+    implementation(files("libs/TJHana-sdk-android-1.0.7.aar"))
+    // on-prem 지원 브렌치는 mavenLocal 스냅샷. 정식 릴리즈 후 -onprem-SNAPSHOT suffix 제거.
+    implementation("com.tjlabs:TJLabsJupiter-sdk-android:2.0.28-onprem-SNAPSHOT")
 }
 <!-- APP_DEPENDENCIES_END -->
 ```
+
+`settings.gradle.kts` 의 `dependencyResolutionManagement.repositories` 에 `mavenLocal()` 추가 필요
+(정식 릴리즈 전까지 스냅샷 배포용).
 
 ## Quick Guide
 
@@ -123,7 +160,18 @@ AUTH_ACCESS_KEY=YOUR_ACCESS_KEY
 AUTH_SECRET_ACCESS_KEY=YOUR_SECRET_ACCESS_KEY
 ```
 
-### 2. Authenticate
+### 2. (선택) 서버 URL 오버라이드
+
+Hana SDK 는 기본으로 하나 온프레미스 서버로 접속합니다 (base URL 은 배포처에서 별도 공유).
+다른 서버 (예: 사내 개발/테스트) 를 쓰려면 auth 이전에:
+
+```kotlin
+TJHanaEnvironment.setBaseUrl("http://<other-server>:<port>")
+```
+
+새 IP 를 `network_security_config.xml` 에도 등록해야 합니다. (위 [필수] 절 참고)
+
+### 3. Authenticate
 
 ```kotlin
 TJHanaAuth.auth(application, accessKey, accessSecretKey) { code, success ->
@@ -131,7 +179,7 @@ TJHanaAuth.auth(application, accessKey, accessSecretKey) { code, success ->
 }
 ```
 
-### 3. Initialize services
+### 4. Initialize services
 
 Auth success 이후:
 
@@ -142,14 +190,14 @@ venusManager.initialize(id = userId, sector_id = sectorId)
 
 This demo initializes Warp/Venus after auth. Jupiter is initialized separately by the `Init Jupiter Service` button.
 
-### 4. Start services
+### 5. Start services
 
 ```kotlin
 warpView.startService()
 venusManager.startService()
 ```
 
-### 5. Warp UI control
+### 6. Warp UI control
 
 ```kotlin
 warpView.setVisibility(true)
@@ -164,14 +212,18 @@ override fun onWarpSelectionChanged(wards: List<WarpWard>) {
 }
 ```
 
-### 6. Stop services
+### 7. Stop services
 
 ```kotlin
 warpView.stopService()
 venusManager.stopService()
 ```
 
-### 7. Jupiter manager (Hana SDK 1.0.1+)
+### 8. Jupiter manager (Hana SDK 1.0.1+)
+
+> ⚠️ **on-prem 모드에서는 Jupiter positioning 이 현재 지원되지 않습니다.** Jupiter 는 REC/CALC
+> endpoint 를 사용하는데 on-prem PMS 스펙이 아직 확정되지 않았습니다. Warp / Venus 는 정상
+> 동작하며, Jupiter API 는 다음 릴리즈에서 on-prem 지원 예정.
 
 ```kotlin
 val jupiterManager = TJJupiterManager(application, userId, sectorId, false)
@@ -203,7 +255,7 @@ jupiterManager.requestRouting(
 
 > ⚠️ Hana SDK 1.0.6 임시 동작: `requestRouting`은 요청 내용과 무관하게 항상 고정된 `SAMPLE_ROUTING_RESULT`를 completion으로 반환합니다. 정식 동작 전환 시 제거되는 임시 처리입니다.
 
-### 8. Jupiter Mock Mode (Hana SDK 1.0.6+)
+### 9. Jupiter Mock Mode (Hana SDK 1.0.6+)
 
 연동 테스트/UI 확인용으로 실제 측위 대신 **고정 경로를 따라가는 mock `JupiterResult`를 스트리밍**할 수 있습니다. 이 데모 앱에서는 화면의 **`Jupiter Mock Mode` 버튼**으로 토글할 수 있습니다.
 
@@ -240,3 +292,23 @@ override fun isNavigationRouteChanged(
 
 - `demoUserId = "HanaUser01"`
 - `demoSectorId = 8`
+
+## Migration Notes (1.0.7)
+
+이전 버전 (1.0.6 이하) 소비 코드가 아래 필드에 접근하고 있으면 조정 필요:
+
+- **`WarpWard.x`, `WarpWard.y` 제거**  
+  Warp 는 근접(proximity) 서비스로 좌표 개념이 없어 해당 필드를 삭제. 컴파일 시 해당 참조를
+  제거해야 합니다. 좌표가 필요하면 Venus 를 사용하세요.
+
+- **`VenusResult.x`, `VenusResult.y` 타입 변경 (`Int` → `Float`)**  
+  이전엔 픽셀 좌표(정수) 였으나, 이제 번들의 `map_image.scale_x/y` · `offset_x/y` 가 적용된
+  **미터 단위 실좌표(Float)** 를 제공합니다. 픽셀→미터 변환:  
+  `meter_x = (px_x - offset_x) / scale_x`, `meter_y = (px_y - offset_y) / scale_y`  
+  `Int` 로 받던 코드는 타입 미스매치로 컴파일 에러 발생 → `Float` 로 수정.
+
+- **cloud 서버 설정 API 제거** (`TJHanaEnvironment.updateServerConfig` 등)  
+  Hana SDK 는 이제 on-prem 전용입니다. 기존에 이 API 를 호출하지 않았다면 영향 없음.
+  다른 서버 URL 로 이관하려면 [Quick Guide #2](#2-선택-서버-url-오버라이드) 참고.
+
+- **`network_security_config.xml` 필수** — 위 [Cleartext HTTP (필수)](#️-cleartext-http-필수) 참고.
