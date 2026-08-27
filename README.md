@@ -5,11 +5,11 @@
 TJHana-demo-android is a minimal Android sample app for integrating **TJLabs Hana SDK (AAR)**.
 
 <!-- JUPITER_SDK_VERSION_START -->
-Jupiter SDK version: 2.0.28-onprem-SNAPSHOT (on-prem 지원 브렌치, mavenLocal)
+Jupiter SDK version: 2.0.29 (on-prem 지원 포함, JitPack)
 <!-- JUPITER_SDK_VERSION_END -->
 
 <!-- HANA_SDK_AAR_VERSION_START -->
-Hana SDK (AAR): TJHana-sdk-android-1.0.7
+Hana SDK: `com.github.tjlabs:TJHana-sdk-android:1.1.0` (JitPack)
 <!-- HANA_SDK_AAR_VERSION_END -->
 
 The app demonstrates Hana SDK flows with:
@@ -63,25 +63,47 @@ Runtime permission check in this demo requires:
 - Location (`FINE`)
 - Bluetooth scan on Android 12+
 
-### ⚠️ Cleartext HTTP (필수)
+### ⚠️ Network Security Config (필수)
 
-Hana SDK 는 on-prem PMS 서버 (`http://<host>:<port>`) 로 접속합니다. Android 9(API 28)+ 는
-평문 통신을 기본 차단하므로 **소비 앱에서 network security config 를 설정해야 합니다.**
+Hana SDK 는 on-prem 서버 (HTTPS + 사설 CA) 로 접속합니다. Android 는 사설 CA 를 기본으로
+신뢰하지 않으므로 **소비 앱에서 network security config 를 설정해야 합니다.**
+
+#### 1) CA 인증서 파일 배치
+
+서버 배포처로부터 받은 CA 인증서 (`.crt`) 를 아래 경로에 배치합니다:
+
+```text
+app/src/main/res/raw/tjlabs_hana_server_ca.crt
+```
+
+- 파일명은 소문자·숫자·언더스코어만 허용 (Android 리소스 명명 규칙)
+- 파일은 저장소에 커밋하지 않는 것을 권장 (`.gitignore` 에 등록)
+
+#### 2) `network_security_config.xml` 생성
 
 `app/src/main/res/xml/network_security_config.xml`:
 
 ```xml
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
+    <!-- 하나 온프레미스 (HTTPS 사설 CA + HTTP 병행 허용) -->
     <domain-config cleartextTrafficPermitted="true">
-        <!-- 하나 온프레미스 서버 IP (배포처에서 공유받은 값 사용) -->
         <domain includeSubdomains="false">HANA_SERVER_IP</domain>
-        <!-- 다른 서버 (예: 사내 개발) 사용 시 해당 IP 추가 -->
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+            <certificates src="@raw/tjlabs_hana_server_ca" />
+        </trust-anchors>
     </domain-config>
 </network-security-config>
 ```
 
-`AndroidManifest.xml`:
+- `HANA_SERVER_IP` 는 배포처에서 공유받은 값을 사용
+- `TJHanaEnvironment.setBaseUrl(...)` 로 다른 서버 IP 를 지정하는 경우 해당 IP 도 여기에 추가
+- 다른 HTTP 전용 서버 (예: 사내 개발 서버) 는 별도 `<domain-config cleartextTrafficPermitted="true">`
+  블록에 등록 (trust-anchors 생략)
+
+#### 3) `AndroidManifest.xml` 참조 추가
 
 ```xml
 <application
@@ -89,12 +111,17 @@ Hana SDK 는 on-prem PMS 서버 (`http://<host>:<port>`) 로 접속합니다. An
     ...>
 ```
 
-`TJHanaEnvironment.setBaseUrl(...)` 로 다른 서버 IP 를 지정하는 경우, 해당 IP 도 위 config 에
-추가해야 합니다. 등록되지 않은 cleartext 호스트로 요청 시 다음 에러가 발생합니다:
+#### SDK 가 자동 처리하는 부분
 
-```
-CLEARTEXT communication to <ip> not permitted by network security policy
-```
+- **Hostname 검증 우회** (host-scope) — 인증서 CN 이 URL host 와 일치하지 않아도 on-prem host
+  로 스코프 제한된 HostnameVerifier 가 자동 pass. cloud/외부 SaaS 통신엔 영향 없음.
+- **URL rewrite** — 서버 응답의 raw bundle URL 에 `/api` prefix 자동 주입 (on-prem 모드).
+
+#### 자주 발생하는 에러
+
+- `CLEARTEXT communication to <ip> not permitted` — HTTP 호스트가 config 에 미등록
+- `SSLHandshakeException: Trust anchor not found` — CA 인증서 (`@raw/tjlabs_hana_server_ca`) 미등록
+- `SSLPeerUnverifiedException: Hostname ... not verified` — SDK 버전 확인 (1.1.0+ 에서 host-scope 우회 지원)
 
 ## Setup
 
@@ -120,33 +147,19 @@ dependencyResolutionManagement {
 }
 ```
 
-### 2. Place Hana AAR
-
-Copy AAR file into:
-
-```text
-<!-- HANA_AAR_PATH_START -->
-app/libs/TJHana-sdk-android-1.0.7.aar
-<!-- HANA_AAR_PATH_END -->
-```
-
-If file name changes, update `hanaAarName` in `app/build.gradle.kts`.
-
-### 3. Add dependencies
+### 2. Add dependencies
 
 ```kotlin
 // app/build.gradle.kts
 <!-- APP_DEPENDENCIES_START -->
 dependencies {
-    implementation(files("libs/TJHana-sdk-android-1.0.7.aar"))
-    // on-prem 지원 브렌치는 mavenLocal 스냅샷. 정식 릴리즈 후 -onprem-SNAPSHOT suffix 제거.
-    implementation("com.tjlabs:TJLabsJupiter-sdk-android:2.0.28-onprem-SNAPSHOT")
+    implementation("com.github.tjlabs:TJHana-sdk-android:1.1.0")
+    // Jupiter SDK 는 Hana SDK 의 transitive dependency 로 자동 포함됩니다.
+    // 명시적으로 pinning 하고 싶을 때만 아래 줄을 추가하세요.
+    // implementation("com.github.tjlabs:TJLabsJupiter-sdk-android:2.0.29")
 }
 <!-- APP_DEPENDENCIES_END -->
 ```
-
-`settings.gradle.kts` 의 `dependencyResolutionManagement.repositories` 에 `mavenLocal()` 추가 필요
-(정식 릴리즈 전까지 스냅샷 배포용).
 
 ## Quick Guide
 
@@ -293,22 +306,46 @@ override fun isNavigationRouteChanged(
 - `demoUserId = "HanaUser01"`
 - `demoSectorId = 8`
 
-## Migration Notes (1.0.7)
+## Migration Notes (1.1.0)
 
-이전 버전 (1.0.6 이하) 소비 코드가 아래 필드에 접근하고 있으면 조정 필요:
+on-prem SDK 로 전환된 첫 정식 minor 릴리즈. 이전 버전 (1.0.x) 소비 코드에서 확인 필요한 항목:
 
-- **`WarpWard.x`, `WarpWard.y` 제거**  
-  Warp 는 근접(proximity) 서비스로 좌표 개념이 없어 해당 필드를 삭제. 컴파일 시 해당 참조를
-  제거해야 합니다. 좌표가 필요하면 Venus 를 사용하세요.
+### 좌표 필드 변경 — Warp / Venus 모두 **미터 실좌표**
 
-- **`VenusResult.x`, `VenusResult.y` 타입 변경 (`Int` → `Float`)**  
-  이전엔 픽셀 좌표(정수) 였으나, 이제 번들의 `map_image.scale_x/y` · `offset_x/y` 가 적용된
-  **미터 단위 실좌표(Float)** 를 제공합니다. 픽셀→미터 변환:  
-  `meter_x = (px_x - offset_x) / scale_x`, `meter_y = (px_y - offset_y) / scale_y`  
-  `Int` 로 받던 코드는 타입 미스매치로 컴파일 에러 발생 → `Float` 로 수정.
+- **`WarpWard.x`, `WarpWard.y`** — 필드는 유지되나 **타입이 `Int` (픽셀) → `Float` (미터)** 로 변경.
+- **`VenusResult.x`, `VenusResult.y`** — 동일하게 `Int` → `Float` (미터).
 
-- **cloud 서버 설정 API 제거** (`TJHanaEnvironment.updateServerConfig` 등)  
-  Hana SDK 는 이제 on-prem 전용입니다. 기존에 이 API 를 호출하지 않았다면 영향 없음.
-  다른 서버 URL 로 이관하려면 [Quick Guide #2](#2-선택-서버-url-오버라이드) 참고.
+두 필드는 번들의 `map_image.scale_x/y` · `offset_x/y` 가 적용된 실좌표입니다:
 
-- **`network_security_config.xml` 필수** — 위 [Cleartext HTTP (필수)](#️-cleartext-http-필수) 참고.
+```
+meter_x = (px_x - offset_x) / scale_x
+meter_y = (px_y - offset_y) / scale_y    // scale_y 대개 음수 → y 뒤집힘
+```
+
+`Int` 로 받던 코드는 타입 미스매치로 컴파일 에러 발생 → `Float` 로 수정 필요.
+
+### 서버 설정 API 변경
+
+- **cloud 서버 설정 API 제거** (`TJHanaEnvironment.updateServerConfig`,
+  `warp/jupiter/venusServerConfig` 등) — Hana SDK 는 on-prem 전용으로 전환.
+- **기본 접속 서버 자동 활성화** — 소비 앱은 별도 설정 없이 `TJHanaAuth.auth(...)` 를 호출하면
+  기본 하나 온프레미스 서버로 접속. 다른 서버 이관 시에만 `TJHanaEnvironment.setBaseUrl(url)`.
+- 기존에 cloud API 를 호출하지 않았다면 코드 변경 불필요.
+
+### Jupiter 상태
+
+on-prem 모드에서 Jupiter positioning 은 아직 미지원 (REC/CALC 스펙 확정 대기). Warp / Venus 는
+정상 동작.
+
+### 필수 세팅 (이전과 다름)
+
+- **Network Security Config + CA 인증서** — 위
+  [Network Security Config (필수)](#️-network-security-config-필수) 참고. HTTPS 사설 CA 를
+  신뢰하려면 `res/raw/tjlabs_hana_server_ca.crt` 배치 + trust anchor 등록 필수.
+
+### 하위 SDK 버전 (transitive)
+
+- Jupiter SDK: `2.0.29` (on-prem 지원 포함)
+- Resource SDK: `1.1.11` (on-prem endpoint + URL rewrite + HostnameVerifier)
+- Auth SDK: `1.0.28`
+- Common SDK: `1.0.29`
