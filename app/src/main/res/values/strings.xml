@@ -8,8 +8,6 @@
     <string name="venus_start_button">Start Venus Service</string>
     <string name="venus_stop_button">Stop Venus Service</string>
     <string name="jupiter_init_button">Init Jupiter Service</string>
-    <string name="jupiter_mock_off">Jupiter Mock Mode: OFF</string>
-    <string name="jupiter_mock_on">Jupiter Mock Mode: ON</string>
     <string name="jupiter_start_button">Start Jupiter Service</string>
     <string name="jupiter_stop_button">Stop Jupiter Service</string>
     <string name="jupiter_destination_button">Set Jupiter Destination</string>

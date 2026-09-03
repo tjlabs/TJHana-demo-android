@@ -21,8 +21,6 @@ import com.tjlabs.tjhana_sdk_android.JupiterNavigationRoute
 import com.tjlabs.tjhana_sdk_android.JupiterResult
 import com.tjlabs.tjhana_sdk_android.JupiterServiceCode
 import com.tjlabs.tjhana_sdk_android.Point
-import com.tjlabs.tjhana_sdk_android.RequestType
-import com.tjlabs.tjhana_sdk_android.RoutingStart
 import com.tjlabs.tjhana_sdk_android.TJHanaAuth
 import com.tjlabs.tjhana_sdk_android.TJHanaLogger
 import com.tjlabs.tjhana_sdk_android.TJJupiterManager
@@ -53,7 +51,6 @@ class MainActivity : AppCompatActivity() {
     private var isWarpInitialized = false
     private var isVenusInitialized = false
     private var isJupiterInitialized = false
-    private var isJupiterMockEnabled = false
     private var authStatusText = "Auth: 대기"
     private var warpInitStatusText = "Warp init: 대기"
     private var venusInitStatusText = "Venus init: 대기"
@@ -176,16 +173,16 @@ class MainActivity : AppCompatActivity() {
                     showResult("[Jupiter] user guidance out")
                 }
 
-                override fun isNavigationRouteChanged(
-                    routeId: String?,
-                    totalDistance: Int?,
-                    routes: List<JupiterNavigationRoute>
-                ) {
+                override fun isNavigationRouteChanged(routes: List<JupiterNavigationRoute>) {
                     showResult("[Jupiter] route changed: count=${routes.size}")
                 }
 
                 override fun isNavigationRouteFailed() {
                     showResult("[Jupiter] route failed")
+                }
+
+                override fun isUserArrived() {
+                    showResult("[Jupiter] user arrived")
                 }
 
                 override fun isWaypointChanged(waypoints: List<List<Double>>) {
@@ -275,26 +272,14 @@ class MainActivity : AppCompatActivity() {
             showResult("[Jupiter] initialize 호출")
         }
 
-        findViewById<Button>(R.id.btn_jupiter_mock_toggle).setOnClickListener { button ->
-            if (!isJupiterInitialized) {
-                showResult("먼저 Jupiter Init을 진행하세요")
-                return@setOnClickListener
-            }
-            isJupiterMockEnabled = !isJupiterMockEnabled
-            jupiterManager.setMockMode(isJupiterMockEnabled)
-            (button as Button).setText(
-                if (isJupiterMockEnabled) R.string.jupiter_mock_on else R.string.jupiter_mock_off
-            )
-            showResult("[Jupiter] mock mode = $isJupiterMockEnabled")
-        }
-
         findViewById<Button>(R.id.btn_jupiter_start).setOnClickListener {
             if (!isAuthCompleted || !isJupiterInitialized) {
                 showResult("먼저 Auth/Jupiter Init을 진행하세요")
                 return@setOnClickListener
             }
-            jupiterManager.startService(UserMode.MODE_PEDESTRIAN)
-            showResult("[Jupiter] startService 호출")
+            // Notion 사양: startService(resultIntervalMs = 1000, mode = MODE_VEHICLE)
+            jupiterManager.startService(resultIntervalMs = 1000, mode = UserMode.MODE_PEDESTRIAN)
+            showResult("[Jupiter] startService 호출 (resultIntervalMs=1000)")
         }
 
         findViewById<Button>(R.id.btn_jupiter_stop).setOnClickListener {
@@ -322,14 +307,14 @@ class MainActivity : AppCompatActivity() {
                 showResult("먼저 Auth/Jupiter Init을 진행하세요")
                 return@setOnClickListener
             }
-            val start = RoutingStart(level_id = 1, x = 0, y = 0, absolute_heading = 0)
+            // Notion 사양: requestRouting(end, waypoints, completion) — 시작점/RequestType/isVehicle 제거
             val destination = Point(level_id = 1, x = 10, y = 10)
-            jupiterManager.requestRouting(start, destination, emptyList(), RequestType.INIT, false) { result ->
+            jupiterManager.requestRouting(destination, emptyList()) { result ->
                 val summary = result.routes.joinToString("\n") {
                     "level=${it.level_name}(${it.level_id}) (${it.x}, ${it.y})"
                 }
                 showResult(
-                    "[Jupiter] routing 결과 ($start -> $destination)\n" +
+                    "[Jupiter] routing 결과 (-> $destination)\n" +
                         "failureReason=${result.failureReason?.value ?: "nil"}\n" +
                         summary
                 )
@@ -343,7 +328,7 @@ class MainActivity : AppCompatActivity() {
         val wardDetails = wards.joinToString("\n\n") { ward ->
             val urls = ward.ward_contents.map { it.contents_url.toString() }.distinct()
             buildString {
-                append("ward id=${ward.id}, name=${ward.ward_name}, rssi=${ward.ward_rssi}, x=${ward.x}, y=${ward.y}\n")
+                append("ward id=${ward.id}, level_id=${ward.level_id}, name=${ward.ward_name}, rssi=${ward.ward_rssi}, x=${ward.x}, y=${ward.y}\n")
                 append(
                     if (urls.isEmpty()) "  urls: - 없음"
                     else "  urls:\n" + urls.joinToString("\n") { "  - $it" }
@@ -358,7 +343,7 @@ class MainActivity : AppCompatActivity() {
         if (wards.isEmpty()) return "[Warp] selection changed: count=0"
 
         val summary = wards.joinToString("\n") {
-            "id=${it.id}, name=${it.ward_name}, rssi=${it.ward_rssi}, x=${it.x}, y=${it.y}"
+            "id=${it.id}, level_id=${it.level_id}, name=${it.ward_name}, rssi=${it.ward_rssi}, x=${it.x}, y=${it.y}"
         }
         return "[Warp] selection changed: count=${wards.size}\n$summary"
     }

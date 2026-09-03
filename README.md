@@ -5,11 +5,11 @@
 TJHana-demo-android is a minimal Android sample app for integrating **TJLabs Hana SDK (AAR)**.
 
 <!-- JUPITER_SDK_VERSION_START -->
-Jupiter SDK version: 2.0.29 (on-prem 지원 포함, JitPack)
+Jupiter SDK version: 2.0.14
 <!-- JUPITER_SDK_VERSION_END -->
 
 <!-- HANA_SDK_AAR_VERSION_START -->
-Hana SDK: `com.github.tjlabs:TJHana-sdk-android:1.1.0` (JitPack)
+Hana SDK: `com.github.tjlabs:TJHana-sdk-android:1.1.1` (JitPack)
 <!-- HANA_SDK_AAR_VERSION_END -->
 
 The app demonstrates Hana SDK flows with:
@@ -153,7 +153,7 @@ dependencyResolutionManagement {
 // app/build.gradle.kts
 <!-- APP_DEPENDENCIES_START -->
 dependencies {
-    implementation("com.github.tjlabs:TJHana-sdk-android:1.1.0")
+    implementation("com.github.tjlabs:TJHana-sdk-android:1.1.1")
     // Jupiter SDK 는 Hana SDK 의 transitive dependency 로 자동 포함됩니다.
     // 명시적으로 pinning 하고 싶을 때만 아래 줄을 추가하세요.
     // implementation("com.github.tjlabs:TJLabsJupiter-sdk-android:2.0.29")
@@ -234,15 +234,20 @@ venusManager.stopService()
 
 ### 8. Jupiter manager (Hana SDK 1.0.1+)
 
-> ⚠️ **on-prem 모드에서는 Jupiter positioning 이 현재 지원되지 않습니다.** Jupiter 는 REC/CALC
-> endpoint 를 사용하는데 on-prem PMS 스펙이 아직 확정되지 않았습니다. Warp / Venus 는 정상
-> 동작하며, Jupiter API 는 다음 릴리즈에서 on-prem 지원 예정.
+> ⚠️ **현재 Jupiter 는 mock-only 빌드입니다.** 온프렘 서버에 Jupiter 백엔드가 준비되기 전까지
+> `initialize` / `startService` / `requestRouting` 은 실 서버 호출 없이 즉시 성공 콜백을 반환하고,
+> `startService` 는 내부 SAMPLE 경로를 `resultIntervalMs` 주기로 `onJupiterResult` 로 스트리밍합니다.
+> 정식 서버 연동 시 이 임시 처리는 제거됩니다.
 
 ```kotlin
 val jupiterManager = TJJupiterManager(application, userId, sectorId, false)
 jupiterManager.delegate = object : TJJupiterManagerDelegate { /* ... */ }
 jupiterManager.initialize()
-jupiterManager.startService(UserMode.MODE_PEDESTRIAN)
+// resultIntervalMs(optional, default 1000ms): onJupiterResult 콜백 주기(ms)
+jupiterManager.startService(resultIntervalMs = 1000, mode = UserMode.MODE_PEDESTRIAN)
+
+// 런타임 중 콜백 주기만 변경
+jupiterManager.setResultInterval(milliseconds = 500)
 ```
 
 Set destination:
@@ -251,42 +256,22 @@ Set destination:
 jupiterManager.setNavigationDestination(Point(level_id = 1, x = 10, y = 10))
 ```
 
-Request routing (SDK 1.0.6+ requires a completion callback):
+Request routing (Notion 사양: end, waypoints, completion 3 파라미터):
 
 ```kotlin
 jupiterManager.requestRouting(
-    RoutingStart(level_id = 1, x = 0, y = 0, absolute_heading = 0),
-    Point(level_id = 1, x = 10, y = 10),
-    emptyList(),
-    RequestType.INIT,
-    false
+    end = Point(level_id = 1, x = 10, y = 10),
+    waypoints = emptyList()
 ) { result ->
     // result.routes: List<RoutingRoute>
     // result.failureReason: NavigationRouteFailureReason?
 }
 ```
 
-> ⚠️ Hana SDK 1.0.6 임시 동작: `requestRouting`은 요청 내용과 무관하게 항상 고정된 `SAMPLE_ROUTING_RESULT`를 completion으로 반환합니다. 정식 동작 전환 시 제거되는 임시 처리입니다.
-
-### 9. Jupiter Mock Mode (Hana SDK 1.0.6+)
-
-연동 테스트/UI 확인용으로 실제 측위 대신 **고정 경로를 따라가는 mock `JupiterResult`를 스트리밍**할 수 있습니다. 이 데모 앱에서는 화면의 **`Jupiter Mock Mode` 버튼**으로 토글할 수 있습니다.
-
-```kotlin
-// Jupiter가 initialize된 이후 호출
-jupiterManager.setMockMode(true)   // 이후 startService에서 mock 스트림도 함께 시작
-jupiterManager.startService(UserMode.MODE_PEDESTRIAN)
-// ...
-jupiterManager.stopService { _, _ -> } // mock 타이머까지 함께 정지
-```
-
-동작 요약:
-- 간격 0.2초 (5 Hz), 가정 속도 4.0 m/s, 내부 SAMPLE 경로(`level_id=700`, `"B2"`, 좌표 (70,10)→(70,18)→(10,18)→(10,29)→(5,29))를 등속 리샘플링
-- 각 tick의 `JupiterResult`는 `TJJupiterManagerDelegate.onJupiterResult(...)`로 메인 스레드 전달
-- Mock 활성 동안 하위 SDK로부터 오는 실제 `onJupiterResult`는 무시됨
-- 경로 끝 도달 시 자동 정지
-
-> ⚠️ Mock은 개발/연동 확인용 임시 기능이며, 프로덕션 로직이 mock 결과에 의존하도록 만들지 마세요.
+> ⚠️ Hana SDK 1.1.1 임시 동작: 온프렘 Jupiter 백엔드가 준비되기 전까지 SDK 는 mock-only 빌드로 동작합니다.
+> - `initialize` / `startService` 는 즉시 성공 콜백을 반환하고, `startService` 는 내부 SAMPLE 경로(`level_id=700`, `"B2"`, 좌표 (70,10)→(70,18)→(10,18)→(10,29)→(5,29))를 `resultIntervalMs` 주기로 `onJupiterResult` 로 스트리밍합니다.
+> - `requestRouting` 은 요청 내용과 무관하게 고정된 `SAMPLE_ROUTING_RESULT` 를 completion 으로 반환합니다.
+> - `setMockMode` 는 `@Deprecated` no-op (현재 빌드는 항상 mock).
 
 Delegate callbacks used in this demo:
 
@@ -294,17 +279,50 @@ Delegate callbacks used in this demo:
 override fun onInitSuccess(isSuccess: Boolean, errorCode: InitErrorCode?) { }
 override fun onJupiterSuccess(isSuccess: Boolean, errorCode: JupiterErrorCode?) { }
 override fun onJupiterResult(result: JupiterResult) { }
-override fun isNavigationRouteChanged(
-    routeId: String?,
-    totalDistance: Int?,
-    routes: MutableList<JupiterNavigationRoute>
-) { }
+override fun isUserArrived() { }
+override fun isNavigationRouteChanged(routes: List<JupiterNavigationRoute>) { }
 ```
 
 ## Demo Defaults
 
 - `demoUserId = "HanaUser01"`
 - `demoSectorId = 8`
+
+## Migration Notes (1.1.1)
+
+Notion 사양 반영 + 온프렘 대응 mock-only Jupiter 빌드. 이전 버전 (1.1.0) 대비 변경점:
+
+### Jupiter — mock-only 빌드 유지
+
+온프렘 서버에 Jupiter 백엔드가 준비되기 전까지, SDK 소비자가 호출 구조를 그대로 맞춰 개발할 수
+있도록 `initialize` / `startService` / `requestRouting` 이 모두 즉시 성공 콜백을 반환한다.
+
+- `startService(resultIntervalMs = 1000, mode = ...)` — 호출 즉시 mock `JupiterResult` 스트림 시작.
+- `requestRouting(end, waypoints, completion)` — 요청 내용과 무관하게 고정 `SAMPLE_ROUTING_RESULT` 반환.
+- `setResultInterval(milliseconds)` — 스트림 주기 런타임 변경.
+- `setMockMode(flag)` — `@Deprecated` no-op (현재 빌드는 항상 mock).
+- `RoutingStart`, `RequestType`, `isVehicle` 파라미터는 사양에서 삭제됨.
+
+### Delegate 시그니처 변경 (TJJupiterManagerDelegate)
+
+- `isNavigationRouteChanged(routeId, totalDistance, routes)` → `isNavigationRouteChanged(routes)` 로 단순화.
+- `isUserArrived()` 콜백 신설 (목적지 도착).
+
+### 모델 변경
+
+- **`WarpWard.level_id: Int` 필드 신설** — 각 ward 가 속한 층 식별자가 함께 전달됨. `onClick` /
+  `onWarpSelectionChanged` 로 오는 ward 는 서버 번들의 부모 level `id` 로 태깅.
+- `PositionRequest` → **`Position`** 리네임 (`JupiterResult.jupiter_pos`, `navi_pos`).
+- `JupiterNavigationRoute` 필드 순서 재배치 (buildingName, levelName, x, y 필수 + routeId /
+  totalDistance / levelId / nodeNumber 는 nullable).
+- `NavigationRouteFailureReason` 에 `INTERNAL_ERROR` / `SCALE_OFFSET_ERROR` 값 추가.
+
+### 하위 SDK 버전 (transitive)
+
+- Jupiter SDK: `2.0.29` (on-prem 지원 포함)
+- Resource SDK: `1.1.11` (on-prem endpoint + URL rewrite + HostnameVerifier)
+- Auth SDK: `1.0.28`
+- Common SDK: `1.0.29`
 
 ## Migration Notes (1.1.0)
 
@@ -332,20 +350,8 @@ meter_y = (px_y - offset_y) / scale_y    // scale_y 대개 음수 → y 뒤집�
   기본 하나 온프레미스 서버로 접속. 다른 서버 이관 시에만 `TJHanaEnvironment.setBaseUrl(url)`.
 - 기존에 cloud API 를 호출하지 않았다면 코드 변경 불필요.
 
-### Jupiter 상태
-
-on-prem 모드에서 Jupiter positioning 은 아직 미지원 (REC/CALC 스펙 확정 대기). Warp / Venus 는
-정상 동작.
-
 ### 필수 세팅 (이전과 다름)
 
 - **Network Security Config + CA 인증서** — 위
   [Network Security Config (필수)](#️-network-security-config-필수) 참고. HTTPS 사설 CA 를
   신뢰하려면 `res/raw/tjlabs_hana_server_ca.crt` 배치 + trust anchor 등록 필수.
-
-### 하위 SDK 버전 (transitive)
-
-- Jupiter SDK: `2.0.29` (on-prem 지원 포함)
-- Resource SDK: `1.1.11` (on-prem endpoint + URL rewrite + HostnameVerifier)
-- Auth SDK: `1.0.28`
-- Common SDK: `1.0.29`
