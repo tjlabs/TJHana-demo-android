@@ -234,11 +234,6 @@ venusManager.stopService()
 
 ### 8. Jupiter manager (Hana SDK 1.0.1+)
 
-> ⚠️ **현재 Jupiter 는 mock-only 빌드입니다.** 온프렘 서버에 Jupiter 백엔드가 준비되기 전까지
-> `initialize` / `startService` / `requestRouting` 은 실 서버 호출 없이 즉시 성공 콜백을 반환하고,
-> `startService` 는 내부 SAMPLE 경로를 `resultIntervalMs` 주기로 `onJupiterResult` 로 스트리밍합니다.
-> 정식 서버 연동 시 이 임시 처리는 제거됩니다.
-
 ```kotlin
 val jupiterManager = TJJupiterManager(application, userId, sectorId, false)
 jupiterManager.delegate = object : TJJupiterManagerDelegate { /* ... */ }
@@ -268,11 +263,6 @@ jupiterManager.requestRouting(
 }
 ```
 
-> ⚠️ Hana SDK 1.1.1 임시 동작: 온프렘 Jupiter 백엔드가 준비되기 전까지 SDK 는 mock-only 빌드로 동작합니다.
-> - `initialize` / `startService` 는 즉시 성공 콜백을 반환하고, `startService` 는 내부 SAMPLE 경로(`level_id=700`, `"B2"`, 좌표 (70,10)→(70,18)→(10,18)→(10,29)→(5,29))를 `resultIntervalMs` 주기로 `onJupiterResult` 로 스트리밍합니다.
-> - `requestRouting` 은 요청 내용과 무관하게 고정된 `SAMPLE_ROUTING_RESULT` 를 completion 으로 반환합니다.
-> - `setMockMode` 는 `@Deprecated` no-op (현재 빌드는 항상 mock).
-
 Delegate callbacks used in this demo:
 
 ```kotlin
@@ -290,18 +280,15 @@ override fun isNavigationRouteChanged(routes: List<JupiterNavigationRoute>) { }
 
 ## Migration Notes (1.1.1)
 
-Notion 사양 반영 + 온프렘 대응 mock-only Jupiter 빌드. 이전 버전 (1.1.0) 대비 변경점:
+Notion 사양 반영. 이전 버전 (1.1.0) 대비 변경점:
 
-### Jupiter — mock-only 빌드 유지
+### Jupiter API 시그니처 변경
 
-온프렘 서버에 Jupiter 백엔드가 준비되기 전까지, SDK 소비자가 호출 구조를 그대로 맞춰 개발할 수
-있도록 `initialize` / `startService` / `requestRouting` 이 모두 즉시 성공 콜백을 반환한다.
-
-- `startService(resultIntervalMs = 1000, mode = ...)` — 호출 즉시 mock `JupiterResult` 스트림 시작.
-- `requestRouting(end, waypoints, completion)` — 요청 내용과 무관하게 고정 `SAMPLE_ROUTING_RESULT` 반환.
-- `setResultInterval(milliseconds)` — 스트림 주기 런타임 변경.
-- `setMockMode(flag)` — `@Deprecated` no-op (현재 빌드는 항상 mock).
-- `RoutingStart`, `RequestType`, `isVehicle` 파라미터는 사양에서 삭제됨.
+- `startService(resultIntervalMs = 1000, mode = ...)` — `resultIntervalMs` (기본 1000ms) 파라미터
+  추가. `onJupiterResult` 콜백 주기를 밀리초 단위로 지정.
+- `setResultInterval(milliseconds)` — 실행 중 콜백 주기를 런타임 변경.
+- `requestRouting(end, waypoints, completion)` — 3 파라미터로 단순화. 기존
+  `RoutingStart` / `RequestType` / `isVehicle` 파라미터는 제거.
 
 ### Delegate 시그니처 변경 (TJJupiterManagerDelegate)
 
