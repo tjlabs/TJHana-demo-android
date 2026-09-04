@@ -9,7 +9,7 @@ Jupiter SDK version: 2.0.14
 <!-- JUPITER_SDK_VERSION_END -->
 
 <!-- HANA_SDK_AAR_VERSION_START -->
-Hana SDK: `com.github.tjlabs:TJHana-sdk-android:1.1.1` (JitPack)
+Hana SDK: `com.github.tjlabs:TJHana-sdk-android:1.1.2` (JitPack)
 <!-- HANA_SDK_AAR_VERSION_END -->
 
 The app demonstrates Hana SDK flows with:
