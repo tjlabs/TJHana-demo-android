@@ -129,7 +129,7 @@ android {
 }
 
 dependencies {
-    implementation("com.github.tjlabs:TJHana-sdk-android:1.1.2")
+    implementation("com.github.tjlabs:TJHana-sdk-android:1.1.3")
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
