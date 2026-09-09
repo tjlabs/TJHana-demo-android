@@ -46,7 +46,7 @@ class MainActivity : AppCompatActivity() {
 
     private val permissionRequestCode = 1001
     private val demoUserId = "HanaUser01"
-    private val demoSectorId = 8
+    private val demoSectorId = 1
     private var isAuthCompleted = false
     private var isWarpInitialized = false
     private var isVenusInitialized = false
