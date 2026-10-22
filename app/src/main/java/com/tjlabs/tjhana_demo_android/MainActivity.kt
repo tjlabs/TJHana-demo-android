@@ -47,6 +47,9 @@ class MainActivity : AppCompatActivity() {
     private val permissionRequestCode = 1001
     private val demoUserId = "HanaUser01"
     private val demoSectorId = 1
+    // 경로 목적지 — 하나 좌표계 기준 (Hana SDK 1.1.9+). sector 1 · B2 (level_id 6).
+    // 층이동 없는 시나리오라 출발 층과 같은 층이어야 한다.
+    private val demoDestination = Point(level_id = 6, x = 7, y = -3)
     private var isAuthCompleted = false
     private var isWarpInitialized = false
     private var isVenusInitialized = false
@@ -278,7 +281,7 @@ class MainActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
             // Notion 사양: startService(resultIntervalMs = 1000, mode = MODE_VEHICLE)
-            jupiterManager.startService(resultIntervalMs = 1000, mode = UserMode.MODE_PEDESTRIAN)
+            jupiterManager.startService(resultIntervalMs = 1000, mode = UserMode.MODE_VEHICLE)
             showResult("[Jupiter] startService 호출 (resultIntervalMs=1000)")
         }
 
@@ -297,7 +300,7 @@ class MainActivity : AppCompatActivity() {
                 showResult("먼저 Auth/Jupiter Init을 진행하세요")
                 return@setOnClickListener
             }
-            val destination = Point(level_id = 1, x = 10, y = 10)
+            val destination = demoDestination
             jupiterManager.setNavigationDestination(destination)
             showResult("[Jupiter] destination 설정: $destination")
         }
@@ -308,7 +311,7 @@ class MainActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
             // Notion 사양: requestRouting(end, waypoints, completion) — 시작점/RequestType/isVehicle 제거
-            val destination = Point(level_id = 1, x = 10, y = 10)
+            val destination = demoDestination
             jupiterManager.requestRouting(destination, emptyList()) { result ->
                 val summary = result.routes.joinToString("\n") {
                     "level=${it.level_name}(${it.level_id}) (${it.x}, ${it.y})"
@@ -326,9 +329,9 @@ class MainActivity : AppCompatActivity() {
         if (wards.isEmpty()) return "[Warp] 클릭 결과: count=0"
 
         val wardDetails = wards.joinToString("\n\n") { ward ->
-            val urls = ward.ward_contents.map { it.contents_url.toString() }.distinct()
+            val urls = ward.contents.map { it.url.toString() }.distinct()
             buildString {
-                append("ward id=${ward.id}, level_id=${ward.level_id}, name=${ward.ward_name}, rssi=${ward.ward_rssi}, x=${ward.x}, y=${ward.y}\n")
+                append("ward id=${ward.id}, level_id=${ward.level_id}, name=${ward.name}, rssi=${ward.rssi}, detected_rssi=${ward.detected_rssi}, x=${ward.x}, y=${ward.y}\n")
                 append(
                     if (urls.isEmpty()) "  urls: - 없음"
                     else "  urls:\n" + urls.joinToString("\n") { "  - $it" }
@@ -343,7 +346,7 @@ class MainActivity : AppCompatActivity() {
         if (wards.isEmpty()) return "[Warp] selection changed: count=0"
 
         val summary = wards.joinToString("\n") {
-            "id=${it.id}, level_id=${it.level_id}, name=${it.ward_name}, rssi=${it.ward_rssi}, x=${it.x}, y=${it.y}"
+            "id=${it.id}, level_id=${it.level_id}, name=${it.name}, rssi=${it.rssi}, detected_rssi=${it.detected_rssi}, x=${it.x}, y=${it.y}"
         }
         return "[Warp] selection changed: count=${wards.size}\n$summary"
     }

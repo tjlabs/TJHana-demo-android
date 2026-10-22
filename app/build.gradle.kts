@@ -49,7 +49,7 @@ val canUseReleaseSigning = releaseStoreFile?.exists() == true &&
         releaseKeyPassword.isNotBlank()
 
 
-val jupiterSdkVersion = "2.0.14"
+val jupiterSdkVersion = "2.0.42"
 
 val syncReadmeVersions by tasks.registering {
     group = "documentation"
@@ -129,7 +129,7 @@ android {
 }
 
 dependencies {
-    implementation("com.github.tjlabs:TJHana-sdk-android:1.1.3")
+    implementation("com.github.tjlabs:TJHana-sdk-android:1.1.9")
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
