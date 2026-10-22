@@ -5,11 +5,11 @@
 TJHana-demo-android is a minimal Android sample app for integrating **TJLabs Hana SDK (AAR)**.
 
 <!-- JUPITER_SDK_VERSION_START -->
-Jupiter SDK version: 2.0.14
+Jupiter SDK version: 2.0.42
 <!-- JUPITER_SDK_VERSION_END -->
 
 <!-- HANA_SDK_AAR_VERSION_START -->
-Hana SDK: `com.github.tjlabs:TJHana-sdk-android:1.1.2` (JitPack)
+Hana SDK: `com.github.tjlabs:TJHana-sdk-android:1.1.9` (JitPack)
 <!-- HANA_SDK_AAR_VERSION_END -->
 
 The app demonstrates Hana SDK flows with:
@@ -153,10 +153,10 @@ dependencyResolutionManagement {
 // app/build.gradle.kts
 <!-- APP_DEPENDENCIES_START -->
 dependencies {
-    implementation("com.github.tjlabs:TJHana-sdk-android:1.1.1")
+    implementation("com.github.tjlabs:TJHana-sdk-android:1.1.9")
     // Jupiter SDK 는 Hana SDK 의 transitive dependency 로 자동 포함됩니다.
     // 명시적으로 pinning 하고 싶을 때만 아래 줄을 추가하세요.
-    // implementation("com.github.tjlabs:TJLabsJupiter-sdk-android:2.0.29")
+    // implementation("com.github.tjlabs:TJLabsJupiter-sdk-android:2.0.42")
 }
 <!-- APP_DEPENDENCIES_END -->
 ```
@@ -232,14 +232,17 @@ warpView.stopService()
 venusManager.stopService()
 ```
 
-### 8. Jupiter manager (Hana SDK 1.0.1+)
+### 8. Jupiter manager (Hana SDK 1.1.9+)
+
+> 좌표계: 입력 `Point` (목적지 · 경유지) 와 출력 (`JupiterResult.jupiter_pos` / `navi_pos`,
+> `RoutingRoute`, `isNavigationRouteChanged`, `isWaypointChanged`) 모두 **하나 좌표계** 기준입니다.
 
 ```kotlin
 val jupiterManager = TJJupiterManager(application, userId, sectorId, false)
 jupiterManager.delegate = object : TJJupiterManagerDelegate { /* ... */ }
 jupiterManager.initialize()
 // resultIntervalMs(optional, default 1000ms): onJupiterResult 콜백 주기(ms)
-jupiterManager.startService(resultIntervalMs = 1000, mode = UserMode.MODE_PEDESTRIAN)
+jupiterManager.startService(resultIntervalMs = 1000, mode = UserMode.MODE_VEHICLE)
 
 // 런타임 중 콜백 주기만 변경
 jupiterManager.setResultInterval(milliseconds = 500)
@@ -248,20 +251,28 @@ jupiterManager.setResultInterval(milliseconds = 500)
 Set destination:
 
 ```kotlin
-jupiterManager.setNavigationDestination(Point(level_id = 1, x = 10, y = 10))
+// 하나 좌표계 · sector 1 B2 (level_id 6)
+jupiterManager.setNavigationDestination(Point(level_id = 6, x = 7, y = -3))
 ```
 
 Request routing (Notion 사양: end, waypoints, completion 3 파라미터):
 
 ```kotlin
 jupiterManager.requestRouting(
-    end = Point(level_id = 1, x = 10, y = 10),
-    waypoints = emptyList()
+    end = Point(level_id = 6, x = 7, y = -3),
+    waypoints = emptyList()   // 목적지와 같은 층의 하나 좌표 Point
 ) { result ->
-    // result.routes: List<RoutingRoute>
+    // result.routes: List<RoutingRoute>  (하나 좌표계)
     // result.failureReason: NavigationRouteFailureReason?
 }
 ```
+
+- 출발지는 **현재 측위 위치** — `startService` 후 첫 `onJupiterResult` 이후에 호출합니다.
+- completion 은 서버 응답 후 1 회. 실패 시 `failureReason`:
+  `INTERNAL_ERROR` (측위 결과 없음 · stopService), `SCALE_OFFSET_ERROR` (해당 층 좌표 변환 정보 없음),
+  `SERVER_RESPONSE` (경로 서버 실패).
+- 같은 경로와 이후 재탐색 경로는 `isNavigationRouteChanged` 로도 전달됩니다.
+- on-prem 에서는 차량이 경로에서 **90 m** 넘게 벗어날 때만 이탈 (`isUserGuidanceOut`) · 재탐색합니다.
 
 Delegate callbacks used in this demo:
 
@@ -276,7 +287,42 @@ override fun isNavigationRouteChanged(routes: List<JupiterNavigationRoute>) { }
 ## Demo Defaults
 
 - `demoUserId = "HanaUser01"`
-- `demoSectorId = 8`
+- `demoSectorId = 1`
+- `demoDestination = Point(level_id = 6, x = 7, y = -3)` (하나 좌표계 · B2)
+- Jupiter `startService(resultIntervalMs = 1000, mode = UserMode.MODE_VEHICLE)`
+
+## Migration Notes (1.1.3 → 1.1.9)
+
+### Warp 모델 필드명 정합화 (1.1.4, BREAKING)
+
+| 이전 | 이후 |
+|---|---|
+| `WarpWard.ward_name` | `WarpWard.name` |
+| `WarpWard.ward_rssi` | `WarpWard.rssi` |
+| `WarpWard.ward_contents` | `WarpWard.contents` |
+| `WardContents.contents_url` | `WardContents.url` |
+
+- `WarpWard.detected_rssi: Int` 추가 (검출 세기값).
+- `TJWarpView.restartScan()` 공개 (1.1.9).
+
+### 좌표 — 모두 하나 좌표계
+
+- Warp / Venus (1.1.4, BREAKING): 변환 방향 수정 — `hana = ours * scale + offset`
+  (아래 1.1.0 노트의 `(px - offset) / scale` 은 더 이상 유효하지 않음). 앱에서 재변환하던 코드가 있으면 제거.
+- **Jupiter (1.1.9, BREAKING)**: `jupiter_pos` · `navi_pos` (x · y · heading), 경로 · 경유지 결과,
+  `requestRouting` / `setNavigationDestination` 입력 `Point` 모두 하나 좌표계.
+
+### Jupiter (1.1.9)
+
+- on-prem 실 Jupiter 연동 (mock 제거). `setMockMode` 는 Deprecated no-op.
+- `requestRouting(end, waypoints, completion)` 실구현 — 출발지 = 현재 측위 위치, 서버 응답 후 completion.
+- `JupiterResult.remain_distance` Deprecated · 항상 `null` (iOS parity).
+- `requestRoutingWithOrigin` Deprecated.
+- on-prem 차량 경로 이탈 기준 90 m.
+
+### 하위 SDK 버전 (transitive, 1.1.9)
+
+- Jupiter SDK `2.0.42` · Resource SDK `1.1.24` · Auth SDK `1.0.29` · Common SDK `1.0.32`
 
 ## Migration Notes (1.1.1)
 
