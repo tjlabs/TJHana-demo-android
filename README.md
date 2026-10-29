@@ -5,11 +5,11 @@
 TJHana-demo-android is a minimal Android sample app for integrating **TJLabs Hana SDK (AAR)**.
 
 <!-- JUPITER_SDK_VERSION_START -->
-Jupiter SDK version: 2.0.42
+Jupiter SDK version: 2.0.43
 <!-- JUPITER_SDK_VERSION_END -->
 
 <!-- HANA_SDK_AAR_VERSION_START -->
-Hana SDK: `com.github.tjlabs:TJHana-sdk-android:1.1.9` (JitPack)
+Hana SDK: `com.github.tjlabs:TJHana-sdk-android:1.1.10` (JitPack)
 <!-- HANA_SDK_AAR_VERSION_END -->
 
 The app demonstrates Hana SDK flows with:
@@ -153,10 +153,10 @@ dependencyResolutionManagement {
 // app/build.gradle.kts
 <!-- APP_DEPENDENCIES_START -->
 dependencies {
-    implementation("com.github.tjlabs:TJHana-sdk-android:1.1.9")
+    implementation("com.github.tjlabs:TJHana-sdk-android:1.1.10")
     // Jupiter SDK 는 Hana SDK 의 transitive dependency 로 자동 포함됩니다.
     // 명시적으로 pinning 하고 싶을 때만 아래 줄을 추가하세요.
-    // implementation("com.github.tjlabs:TJLabsJupiter-sdk-android:2.0.42")
+    // implementation("com.github.tjlabs:TJLabsJupiter-sdk-android:2.0.43")
 }
 <!-- APP_DEPENDENCIES_END -->
 ```
@@ -221,8 +221,27 @@ Warp selection callback example:
 
 ```kotlin
 override fun onWarpSelectionChanged(wards: List<WarpWard>) {
-    // handle selected wards
+    // handle selected wards — wards[0] 이 1등 (감지 세기 순)
 }
+```
+
+`onWarpSelectionChanged` 가 오는 때 (1.1.10+):
+- 선택된 ward 조합이 바뀔 때
+- 조합은 같고 1등만 바뀔 때 — 새 1등이 마지막으로 전달된 1등보다 `leaderMarginDb` (기본 3 dB) 이상 높은
+  상태가 `leaderDwellTicks` (기본 3회) 연속 유지되면
+
+판정 기준은 기본값으로 충분합니다. 바꿔야 할 때만 (`setDecisionConfig` 를 호출하지 않으면 아래 기본값 그대로):
+
+```kotlin
+warpView.setDecisionConfig(
+    TJWarpView.WarpDecisionConfig(
+        qualificationWindowMillis = 5_000L, // 판정 창 — 이 안에서 임계값 이상 샘플로 판정 · 순위
+        requiredHitCount = 4,               // 판정 창 안 최소 충족 샘플 수
+        holdDurationMillis = 4_000L,        // 마지막 감지 후 유지 시간
+        leaderMarginDb = 3.0,               // 같은 조합에서 1등 변경으로 볼 최소 차이 (dB)
+        leaderDwellTicks = 3                // 위 조건이 연속 유지돼야 하는 횟수 (선택 주기 1회 = 1 tick)
+    )
+)
 ```
 
 ### 7. Stop services
@@ -268,9 +287,27 @@ jupiterManager.requestRouting(
 ```
 
 - 출발지는 **현재 측위 위치** — `startService` 후 첫 `onJupiterResult` 이후에 호출합니다.
-- completion 은 서버 응답 후 1 회. 실패 시 `failureReason`:
-  `INTERNAL_ERROR` (측위 결과 없음 · stopService), `SCALE_OFFSET_ERROR` (해당 층 좌표 변환 정보 없음),
-  `SERVER_RESPONSE` (경로 서버 실패).
+- completion 은 요청 1 건당 1 회 (응답 전에 다시 요청하면 이전 completion 은 호출되지 않음).
+  성공이면 `routes`, 실패면 `routes` 가 비고 `failureReason` (1.1.10+ 세분화):
+
+| `failureReason` | 의미 |
+|---|---|
+| `NO_CURRENT_POSITION` | 현재 위치(측위 결과)가 아직 없음 — `startService` 전 · 측위 전 |
+| `LEVEL_NOT_FOUND` | 현재 위치의 층을 찾지 못함 |
+| `SCALE_OFFSET_ERROR` | 목적지 · 경유지 층의 좌표 변환 정보 없음 |
+| `TOO_CLOSE` | 같은 층에서 현재 위치와 목적지가 너무 가까움 (경유지 없이 직선거리가 최소 거리 이하) |
+| `NETWORK_ERROR` | 서버에 닿지 못함 (타임아웃 · 연결 끊김) |
+| `REQUEST_ERROR` | 요청을 만들지 못함 |
+| `REQUEST_REJECTED` | 서버가 요청을 거절 (4xx — 예: 경로 없음) |
+| `SERVER_ERROR` | 서버 오류 (5xx) |
+| `INVALID_RESPONSE` | 서버 응답을 해석하지 못함 |
+| `INVALID_ROUTE` | 받은 경로를 지도 정보로 구성하지 못함 |
+| `NOT_READY` | 서비스가 준비되지 않음 |
+| `CANCELLED` | 응답 전에 `stopService` |
+| `UNKNOWN` | 그 밖의 값 |
+
+- `INTERNAL_ERROR` · `SERVER_RESPONSE` 는 이전 버전 호환용으로 남아 있고 1.1.10 부터는 전달되지 않습니다.
+- 요청 전 단계 실패 (`NO_CURRENT_POSITION` · `LEVEL_NOT_FOUND` · `SCALE_OFFSET_ERROR`) 는 SDK 가 진단용으로 서버에 기록합니다.
 - 같은 경로와 이후 재탐색 경로는 `isNavigationRouteChanged` 로도 전달됩니다.
 - on-prem 에서는 차량이 경로에서 **90 m** 넘게 벗어날 때만 이탈 (`isUserGuidanceOut`) · 재탐색합니다.
 
@@ -282,6 +319,7 @@ override fun onJupiterSuccess(isSuccess: Boolean, errorCode: JupiterErrorCode?) 
 override fun onJupiterResult(result: JupiterResult) { }
 override fun isUserArrived() { }
 override fun isNavigationRouteChanged(routes: List<JupiterNavigationRoute>) { }
+override fun isNavigationRouteFailed() { }   // 이탈 재탐색 등 SDK 자동 요청 실패 포함 — 요청별 사유는 requestRouting completion
 ```
 
 ## Demo Defaults
@@ -290,6 +328,34 @@ override fun isNavigationRouteChanged(routes: List<JupiterNavigationRoute>) { }
 - `demoSectorId = 1`
 - `demoDestination = Point(level_id = 6, x = 7, y = -3)` (하나 좌표계 · B2)
 - Jupiter `startService(resultIntervalMs = 1000, mode = UserMode.MODE_VEHICLE)`
+
+## Migration Notes (1.1.9 → 1.1.10)
+
+코드 변경 없이 버전만 올려도 빌드됩니다 (이 데모도 그대로). 확인할 점:
+
+### 경로 요청 실패 사유 세분화
+
+- `NavigationRouteFailureReason` 값 추가 — 위 [Jupiter manager](#8-jupiter-manager-hana-sdk-119) 표 참고.
+  이전의 `INTERNAL_ERROR` (측위 결과 없음 · stopService) 는 `NO_CURRENT_POSITION` · `CANCELLED` 로,
+  `SERVER_RESPONSE` (경로 서버 실패) 는 `REQUEST_REJECTED` · `SERVER_ERROR` · `INVALID_RESPONSE` · `INVALID_ROUTE` 등으로 나뉨.
+- `failureReason` 을 `when` **식**(값을 반환하는 형태)으로 모든 값을 나열해 쓰고 있었다면 새 값 때문에
+  컴파일 에러가 날 수 있으니 `else` 분기를 추가하세요. `INTERNAL_ERROR` · `SERVER_RESPONSE` 로만 분기하던 코드는
+  새 값으로 바꿔야 실패 사유를 구분할 수 있습니다.
+
+### Warp 선택 알림
+
+- 조합이 같아도 1등이 바뀌면 `onWarpSelectionChanged` 가 옵니다 (위 [Warp UI control](#6-warp-ui-control) 참고) —
+  이전보다 자주 올 수 있습니다.
+- 판정 기본값 변경: 판정 창 10 s → 5 s, 최소 충족 샘플 6 → 4, 유지 시간 5 s → 4 s.
+- `WarpDecisionConfig` 끝에 `leaderMarginDb` · `leaderDwellTicks` 추가 (기본값 있음 — 기존 호출 그대로 컴파일).
+
+### 기타
+
+- Warp · Venus 초기화 때 층 이미지를 받지 않습니다 (API 변경 없음).
+
+### 하위 SDK 버전 (transitive, 1.1.10)
+
+- Jupiter SDK `2.0.43` · Resource SDK `1.1.25` · Auth SDK `1.0.29` · Common SDK `1.0.32`
 
 ## Migration Notes (1.1.3 → 1.1.9)
 
