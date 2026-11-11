@@ -5,11 +5,11 @@
 TJHana-demo-android is a minimal Android sample app for integrating **TJLabs Hana SDK (AAR)**.
 
 <!-- JUPITER_SDK_VERSION_START -->
-Jupiter SDK version: 2.0.43
+Jupiter SDK version: 2.0.44
 <!-- JUPITER_SDK_VERSION_END -->
 
 <!-- HANA_SDK_AAR_VERSION_START -->
-Hana SDK: `com.github.tjlabs:TJHana-sdk-android:1.1.10` (JitPack)
+Hana SDK: `com.github.tjlabs:TJHana-sdk-android:1.1.11` (JitPack)
 <!-- HANA_SDK_AAR_VERSION_END -->
 
 The app demonstrates Hana SDK flows with:
@@ -153,10 +153,10 @@ dependencyResolutionManagement {
 // app/build.gradle.kts
 <!-- APP_DEPENDENCIES_START -->
 dependencies {
-    implementation("com.github.tjlabs:TJHana-sdk-android:1.1.10")
+    implementation("com.github.tjlabs:TJHana-sdk-android:1.1.11")
     // Jupiter SDK 는 Hana SDK 의 transitive dependency 로 자동 포함됩니다.
     // 명시적으로 pinning 하고 싶을 때만 아래 줄을 추가하세요.
-    // implementation("com.github.tjlabs:TJLabsJupiter-sdk-android:2.0.43")
+    // implementation("com.github.tjlabs:TJLabsJupiter-sdk-android:2.0.44")
 }
 <!-- APP_DEPENDENCIES_END -->
 ```
@@ -328,6 +328,21 @@ override fun isNavigationRouteFailed() { }   // 이탈 재탐색 등 SDK 자동 
 - `demoSectorId = 1`
 - `demoDestination = Point(level_id = 6, x = 7, y = -3)` (하나 좌표계 · B2)
 - Jupiter `startService(resultIntervalMs = 1000, mode = UserMode.MODE_VEHICLE)`
+
+## Migration Notes (1.1.10 → 1.1.11)
+
+API 변경 없음 — 버전만 올리면 됩니다.
+
+### Jupiter 서비스 재시작 뒤 경로 이탈 · 재탐색
+
+- `stopService` 후 `initialize` 없이 다시 `startService` 하면 두 번째 세션부터
+  `isUserGuidanceOut` (경로 이탈) 과 자동 재탐색 경로(`isNavigationRouteChanged`)가 오지 않던 문제 수정
+  (Jupiter SDK 2.0.44).
+- `stopService` 는 목적지 · 경로를 초기화하므로, 재시작 후에는 목적지 설정 또는 `requestRouting` 을 다시 호출하세요.
+
+### 하위 SDK 버전 (transitive, 1.1.11)
+
+- Jupiter SDK `2.0.44` · Resource SDK `1.1.25` · Auth SDK `1.0.29` · Common SDK `1.0.32`
 
 ## Migration Notes (1.1.9 → 1.1.10)
 
