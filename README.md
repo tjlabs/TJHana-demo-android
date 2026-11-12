@@ -9,7 +9,7 @@ Jupiter SDK version: 2.0.44
 <!-- JUPITER_SDK_VERSION_END -->
 
 <!-- HANA_SDK_AAR_VERSION_START -->
-Hana SDK: `com.github.tjlabs:TJHana-sdk-android:1.1.12` (JitPack)
+Hana SDK: `com.github.tjlabs:TJHana-sdk-android:1.1.13` (JitPack)
 <!-- HANA_SDK_AAR_VERSION_END -->
 
 The app demonstrates Hana SDK flows with:
@@ -153,7 +153,7 @@ dependencyResolutionManagement {
 // app/build.gradle.kts
 <!-- APP_DEPENDENCIES_START -->
 dependencies {
-    implementation("com.github.tjlabs:TJHana-sdk-android:1.1.12")
+    implementation("com.github.tjlabs:TJHana-sdk-android:1.1.13")
     // Jupiter SDK 는 Hana SDK 의 transitive dependency 로 자동 포함됩니다.
     // 명시적으로 pinning 하고 싶을 때만 아래 줄을 추가하세요.
     // implementation("com.github.tjlabs:TJLabsJupiter-sdk-android:2.0.44")
@@ -310,6 +310,15 @@ jupiterManager.requestRouting(
 - 요청 전 단계 실패 (`NO_CURRENT_POSITION` · `LEVEL_NOT_FOUND` · `SCALE_OFFSET_ERROR`) 는 SDK 가 진단용으로 서버에 기록합니다.
 - 같은 경로와 이후 재탐색 경로는 `isNavigationRouteChanged` 로도 전달됩니다.
 - on-prem 에서는 차량이 경로에서 **30 m** 넘게 벗어날 때만 이탈 (`isUserGuidanceOut`) · 재탐색합니다 (1.1.12+, 이전 90 m).
+- 이탈 거리는 `setRouteFollowingDistance` 로 바꿀 수 있습니다 (1.1.13+):
+
+  ```kotlin
+  jupiterManager.setRouteFollowingDistance(distance = 30f) // m, 5 ~ 100
+  ```
+
+  - 5 보다 작으면 5, 100 보다 크면 100 으로 설정됩니다.
+  - `initialize` 전후 · 서비스 중 언제든 호출할 수 있고, 이후 `initialize` 에도 값이 유지됩니다.
+  - 값이 작을수록 측위가 흔들릴 때 재탐색이 잦아집니다. 보행자 모드 판정에는 영향이 없습니다.
 - SDK 가 자동으로 다시 요청하는 경로 (측위 안정 직후 · 이탈 재탐색) 에는 경유지가 실리지 않고 목적지까지의 경로가 옵니다.
 
 Delegate callbacks used in this demo:
@@ -329,6 +338,20 @@ override fun isNavigationRouteFailed() { }   // 이탈 재탐색 등 SDK 자동 
 - `demoSectorId = 1`
 - `demoDestination = Point(level_id = 6, x = 7, y = -3)` (하나 좌표계 · B2)
 - Jupiter `startService(resultIntervalMs = 1000, mode = UserMode.MODE_VEHICLE)`
+
+## Migration Notes (1.1.12 → 1.1.13)
+
+기존 API 변경 없음 — 버전만 올리면 이전과 같이 동작합니다 (on-prem 이탈 거리 30 m).
+
+### 경로 이탈 거리 설정 API 추가
+
+- `TJJupiterManager.setRouteFollowingDistance(distance: Float)` — 차량이 경로에서 `distance` (m) 넘게
+  벗어나면 이탈 (`isUserGuidanceOut`) 후 자동 재탐색합니다. 범위 5 ~ 100 m (범위 밖 값은 가까운 끝값).
+- 호출하지 않으면 on-prem 30 m (cloud 테스트 모드는 Jupiter 기본 판정).
+
+### 하위 SDK 버전 (transitive, 1.1.13)
+
+- Jupiter SDK `2.0.44` · Resource SDK `1.1.25` · Auth SDK `1.0.29` · Common SDK `1.0.32` (1.1.12 와 같음)
 
 ## Migration Notes (1.1.11 → 1.1.12)
 
