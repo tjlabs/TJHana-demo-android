@@ -5,11 +5,11 @@
 TJHana-demo-android is a minimal Android sample app for integrating **TJLabs Hana SDK (AAR)**.
 
 <!-- JUPITER_SDK_VERSION_START -->
-Jupiter SDK version: 2.0.44
+Jupiter SDK version: 2.0.46
 <!-- JUPITER_SDK_VERSION_END -->
 
 <!-- HANA_SDK_AAR_VERSION_START -->
-Hana SDK: `com.github.tjlabs:TJHana-sdk-android:1.1.13` (JitPack)
+Hana SDK: `com.github.tjlabs:TJHana-sdk-android:1.1.14` (JitPack)
 <!-- HANA_SDK_AAR_VERSION_END -->
 
 The app demonstrates Hana SDK flows with:
@@ -153,10 +153,10 @@ dependencyResolutionManagement {
 // app/build.gradle.kts
 <!-- APP_DEPENDENCIES_START -->
 dependencies {
-    implementation("com.github.tjlabs:TJHana-sdk-android:1.1.13")
+    implementation("com.github.tjlabs:TJHana-sdk-android:1.1.14")
     // Jupiter SDK 는 Hana SDK 의 transitive dependency 로 자동 포함됩니다.
     // 명시적으로 pinning 하고 싶을 때만 아래 줄을 추가하세요.
-    // implementation("com.github.tjlabs:TJLabsJupiter-sdk-android:2.0.44")
+    // implementation("com.github.tjlabs:TJLabsJupiter-sdk-android:2.0.46")
 }
 <!-- APP_DEPENDENCIES_END -->
 ```
@@ -319,6 +319,7 @@ jupiterManager.requestRouting(
   - 5 보다 작으면 5, 100 보다 크면 100 으로 설정됩니다.
   - `initialize` 전후 · 서비스 중 언제든 호출할 수 있고, 이후 `initialize` 에도 값이 유지됩니다.
   - 값이 작을수록 측위가 흔들릴 때 재탐색이 잦아집니다. 보행자 모드 판정에는 영향이 없습니다.
+  - 1.1.14 부터는 20 m 미만 값도 측위 추적 · 탐색 모두에 그대로 적용됩니다 (1.1.13 은 추적 중 20 m 미만 값이 반영되지 않음).
 - SDK 가 자동으로 다시 요청하는 경로 (측위 안정 직후 · 이탈 재탐색) 에는 경유지가 실리지 않고 목적지까지의 경로가 옵니다.
 
 Delegate callbacks used in this demo:
@@ -338,6 +339,21 @@ override fun isNavigationRouteFailed() { }   // 이탈 재탐색 등 SDK 자동 
 - `demoSectorId = 1`
 - `demoDestination = Point(level_id = 6, x = 7, y = -3)` (하나 좌표계 · B2)
 - Jupiter `startService(resultIntervalMs = 1000, mode = UserMode.MODE_VEHICLE)`
+
+## Migration Notes (1.1.13 → 1.1.14)
+
+API 변경 없음 — 버전만 올리면 됩니다.
+
+### 20 m 미만 경로 이탈 거리 반영
+
+- `setRouteFollowingDistance(distance)` 에 **20 m 미만** 값을 주면 1.1.13 에서는 측위 추적 중 판정 기준이 20 m 로 고정돼
+  경로에서 한참 벗어나야 이탈 (`isUserGuidanceOut`) 이 났습니다. 1.1.14 부터는 설정한 거리 그대로 판정합니다
+  (예: 10 m 설정 시 경로에서 약 10 m 벗어나면 이탈).
+- 20 m 이상 값과 기본값 (on-prem 30 m) 은 1.1.13 과 같습니다.
+
+### 하위 SDK 버전 (transitive, 1.1.14)
+
+- Jupiter SDK `2.0.46` · Resource SDK `1.1.25` · Auth SDK `1.0.29` · Common SDK `1.0.32` (Jupiter 만 2.0.44 → 2.0.46)
 
 ## Migration Notes (1.1.12 → 1.1.13)
 
